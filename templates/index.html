@@ -1251,6 +1251,19 @@ function renderMetrics(r) {
   // the everyday vocabulary real people actually use (1.0 = reads like the
   // verified human corpus). Rendered as a 0-100 bar alongside the signals.
   const pr = m.plain_register || {};
+  const dc = m.detector_comparison || {};
+  if (dc.before && dc.after) {
+    const beforeScore = Math.max(0, Math.min(100, Number(dc.before.score) || 0));
+    const afterScore = Math.max(0, Math.min(100, Number(dc.after.score) || 0));
+    const cell = document.createElement("div");
+    cell.className = "metric metric-comparison reveal-up";
+    cell.innerHTML = `
+      <div class="metric-head"><strong>Detector comparison</strong><span class="metric-delta ${dc.after.verdict === "human" ? "up" : "down"}">${esc(String(dc.before.verdict))} → ${esc(String(dc.after.verdict))}</span></div>
+      <div class="metric-desc">same local heuristic before and after; not a third-party detector guarantee</div>
+      <div class="comparison-row"><span>before</span><div class="track"><div class="fill" style="width:${beforeScore}%"></div></div><b>${Math.round(beforeScore)}</b></div>
+      <div class="comparison-row"><span>after</span><div class="track"><div class="fill fill-after" style="width:${afterScore}%"></div></div><b>${Math.round(afterScore)}</b></div>`;
+    grid.appendChild(cell);
+  }
   if (pr.before !== undefined && pr.after !== undefined) {
     const pb = Math.round((pr.before || 0) * 100);
     const pa = Math.round((pr.after || 0) * 100);
@@ -1259,7 +1272,7 @@ function renderMetrics(r) {
       ? `<span class="metric-delta up">▲ +${pd}</span>`
       : `<span class="metric-delta down">▼ −${Math.abs(pd)}</span>`;
     const cell = document.createElement("div");
-    cell.className = "metric";
+    cell.className = "metric reveal-up";
     cell.innerHTML = `
       <div class="metric-head"><strong>Plain register</strong>${pdHtml}</div>
       <div class="metric-desc">everyday words humans actually use (verified memory) — higher = plainer, more human</div>
@@ -1279,7 +1292,7 @@ function renderMetrics(r) {
       ? `<span class="metric-delta up">▲ +${delta}</span>`
       : `<span class="metric-delta down">▼ −${Math.abs(delta)}</span>`);
     const cell = document.createElement("div");
-    cell.className = "metric";
+    cell.className = "metric reveal-up";
     cell.innerHTML = `
       <div class="metric-head"><strong>${label}</strong>${deltaHtml}</div>
       <div class="metric-desc">${desc}</div>
@@ -1786,6 +1799,20 @@ $("run").addEventListener("click", () => { if (mode === "detector") runDetect();
 $("run-humanize").addEventListener("click", runOne);
 $("run-batch").addEventListener("click", runBatch);
 $("run-plag").addEventListener("click", runPlag);
+// Subtle depth motion for pointer users; disabled for touch and reduced-motion preferences.
+(function addDepthMotion() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (window.matchMedia("(pointer: coarse)").matches) return;
+  document.querySelectorAll(".card, .hero").forEach((el) => {
+    el.addEventListener("pointermove", (ev) => {
+      const r = el.getBoundingClientRect();
+      const x = (ev.clientX - r.left) / r.width - 0.5;
+      const y = (ev.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(900px) rotateX(${(-y * 1.8).toFixed(2)}deg) rotateY(${(x * 2.2).toFixed(2)}deg) translateY(-2px)`;
+    });
+    el.addEventListener("pointerleave", () => { el.style.transform = ""; });
+  });
+})();
 init();
 </script>
 </body>

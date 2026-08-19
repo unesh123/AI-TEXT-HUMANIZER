@@ -652,3 +652,63 @@ footer code { font-family: ui-monospace, Menlo, Consolas, monospace; background:
   to { top: 100%; }
 }
 .compare-col { position: relative; }
+
+
+/* Motion layer: lightweight CSS motion without a runtime animation dependency. */
+:root {
+  --motion-fast: 180ms;
+  --motion-smooth: cubic-bezier(.22, 1, .36, 1);
+}
+body {
+  perspective: 1200px;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(93, 92, 222, .10), transparent 32rem),
+    radial-gradient(circle at 88% 18%, rgba(20, 184, 166, .08), transparent 28rem),
+    var(--bg);
+}
+.card, .metric, .bench, .history-item, .upload {
+  transform-style: preserve-3d;
+  transition: transform 420ms var(--motion-smooth), box-shadow 420ms var(--motion-smooth), border-color var(--motion-fast) ease;
+}
+.card:hover, .bench:hover, .history-item:hover {
+  transform: translateY(-3px) rotateX(.35deg);
+  box-shadow: 0 18px 55px rgba(60, 40, 120, .14);
+}
+.reveal-up { animation: reveal-up 560ms var(--motion-smooth) both; }
+.metric-comparison {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: linear-gradient(135deg, rgba(147,51,234,.08), rgba(20,184,166,.06));
+}
+.comparison-row {
+  display: grid; grid-template-columns: 4.5rem 1fr 2.4rem; gap: .65rem;
+  align-items: center; margin-top: .6rem;
+}
+.comparison-row .track { overflow: hidden; }
+.comparison-row .fill { animation: fill-in 900ms var(--motion-smooth) both; transform-origin: left; }
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fill-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes ambient-pulse {
+  0%, 100% { opacity: .72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+.hero-title { animation: reveal-up 700ms var(--motion-smooth) both; }
+button, .mode-tab, select, input, textarea {
+  transition: transform var(--motion-fast) var(--motion-smooth), box-shadow var(--motion-fast) ease, border-color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+button:hover:not(:disabled), .mode-tab:hover { transform: translateY(-2px); }
+button:active:not(:disabled), .mode-tab:active { transform: translateY(0) scale(.98); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+  .card:hover, .bench:hover, .history-item:hover, button:hover:not(:disabled), .mode-tab:hover { transform: none; }
+}

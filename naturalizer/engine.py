@@ -243,6 +243,7 @@ class Naturalizer:
         # text the user will actually see, so the UI can show before/after.
         chosen = llm_rewritten if llm_used else rewritten
         semantic_issues = preservation_issues(text, chosen or text)
+        after_verification = self.detect(chosen or text, style=style)
         after_report = analyze(
             chosen or text,
             allowlist=profile["allowlist"],
@@ -254,6 +255,18 @@ class Naturalizer:
             "before": report.metrics,
             "after": after_report.metrics,
             "after_score": after_report.score,
+            "detector_comparison": {
+                "before": {
+                    "score": report.score,
+                    "verdict": self.detect(text, style=style)["verdict"],
+                },
+                "after": {
+                    "score": after_verification["score"],
+                    "verdict": after_verification["verdict"],
+                    "confidence": after_verification["confidence"],
+                    "distribution": after_verification["distribution"],
+                },
+            },
             # Verified human-writing memory: how plain the register is
             # (fraction of words from the everyday vocabulary humans
             # actually use). 1.0 = reads like the human corpus.
