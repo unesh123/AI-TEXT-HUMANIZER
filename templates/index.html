@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Naturalizer — humanize AI text into natural human prose and detect AI-written content with a full-band analysis.">
+<meta name="theme-color" content="#0b0b16">
+<title>Naturalizer — AI Humanizer &amp; Detector</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239333EA'/%3E%3Cstop offset='1' stop-color='%23EC4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='18' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <!-- ======================= Sidebar ======================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-logo">N</span>
+      <span class="brand-name">Naturalizer</span>
+      <button type="button" class="brand-collapse" id="collapse-sidebar" title="Collapse sidebar" aria-label="Collapse sidebar">◀</button>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-item"><span class="nav-ico">🏠</span><span class="nav-txt">Home</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">AI HUMANIZE &amp; DETECT</div>
+        <div class="nav-item" id="nav-humanizer"><span class="nav-ico">✍️</span><span class="nav-txt">AI Humanizer</span></div>
+        <div class="nav-item active" id="nav-detector"><span class="nav-ico">🔍</span><span class="nav-txt">AI Detector</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">AI LEARNING</div>
+        <div class="nav-item disabled"><span class="nav-ico">▶️</span><span class="nav-txt">YouTube Transcript</span></div>
+        <div class="nav-item disabled"><span class="nav-ico">🧠</span><span class="nav-txt">AI Notes Generator</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-item disabled"><span class="nav-ico">🧩</span><span class="nav-txt">Plugins</span></div>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="plan-chip" id="plan-chip">Free</div>
+      <button type="button" class="upgrade" id="upgrade-btn">🚀 Upgrade to Pro</button>
+      <div class="profile">
+        <span class="avatar">U</span>
+        <span class="profile-email" id="profile-email">uneshbastola888@gmail.com</span>
+        <span class="profile-dots">⋯</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================= Main ======================= -->
+  <main class="main">
+    <header class="hero">
+      <h1 class="hero-title">AI <span class="grad">Humanizer</span> &amp; <span class="grad">AI Detector</span> Online</h1>
+      <p class="hero-sub">Make machine prose read human — then verify it. Paste text or upload a file to humanize it, and check whether text was written by AI or a human, with sentence-level highlights and a naturalness score.</p>
+      <div class="mode-tabs" role="tablist">
+        <button type="button" class="mode-tab" id="tab-humanizer" role="tab">✍️&nbsp; AI Humanizer</button>
+        <button type="button" class="mode-tab active" id="tab-detector" role="tab">🔍&nbsp; AI Detector</button>
+      </div>
+    </header>
+
+    <div id="err-banner" role="alert" hidden></div>
+
+    <section class="workspace">
+      <!-- ======================= Content card ======================= -->
+      <div class="card" id="content-card">
+        <div class="card-head">
+          <h2>Content</h2>
+          <div class="card-head-actions">
+            <button type="button" class="icon-btn" id="copy-input" title="Copy input" aria-label="Copy input">⧉</button>
+            <button type="button" class="icon-btn" id="clear-input" title="Clear" aria-label="Clear input">🗑</button>
+          </div>
+        </div>
+
+        <div class="upload" id="upload">
+          <input type="file" id="file" accept=".txt,.md,.markdown,.docx,.pdf" hidden>
+          <button type="button" id="pick" class="ghost small">Upload TXT / MD / DOCX / PDF</button>
+          <span class="upload-note">Drop a file on this box, or click to browse. Its text is extracted, then you humanize or detect it like any draft.</span>
+        </div>
+
+        <div class="editor-wrap" id="editor-wrap">
+          <textarea id="input" rows="14" placeholder="Paste a draft that reads a bit robotic…"></textarea>
+          <div id="highlighted" class="highlighted" hidden></div>
+          <button type="button" class="ghost small edit-toggle" id="edit-toggle" hidden>✎ Edit original text</button>
+        </div>
+
+        <div class="card-foot">
+          <span class="word-count" id="word-count">0 words</span>
+          <div class="foot-actions">
+            <span id="llm-badge" class="badge badge-off" hidden>LLM off</span>
+            <button type="button" class="primary" id="run">Detect AI</button>
+          </div>
+        </div>
+        <p class="hint" id="hint">Tip: the sample below is stuffed with common AI tells. Hit Detect AI to see what the detector flags.</p>
+        <div id="warnings" hidden></div>
+      </div>
+
+      <!-- ======================= Result card ======================= -->
+      <div class="card" id="result-card">
+        <div class="card-head">
+          <h2>Result</h2>
+          <div class="card-head-actions">
+            <button type="button" class="ghost small" id="perfect-btn" title="Run the live feedback loop: rewrite, re-scan, fix remaining tells, repeat until it reads human">⚡ Perfect humanize</button>
+            <button type="button" class="ghost small" id="compare-btn" title="Run the same input through every configured humanizer and rank the results — pick the best version">⚖ Compare</button>
+            <button type="button" class="ghost small" id="bench-btn" title="Run the detector against the labeled corpus and report its accuracy">📊 Accuracy</button>
+            <button type="button" class="ghost small" id="again-btn" title="Humanize the current result again — more aggressively, different words">↻ Humanize again</button>
+            <button type="button" class="ghost small" id="history-btn" title="Saved runs — input, rewrite and scores">🕘 History</button>
+            <button type="button" class="ghost small" id="detectors-btn" title="Check which AI detectors are configured and live">🔌 Detectors</button>
+            <button type="button" class="ghost small" id="share-btn" title="Copy result" aria-label="Copy result">Share</button>
+            <button type="button" class="ghost small" id="download-pdf">Download PDF</button>
+          </div>
+        </div>
+
+        <!-- --- Detector accuracy benchmark --- -->
+        <div id="bench-out" hidden></div>
+
+        <!-- --- Perfect humanize (feedback loop) --- -->
+        <div id="perfect-out" hidden></div>
+
+        <!-- --- Compare panel (multi-provider ranking) --- -->
+        <div id="compare-out" hidden></div>
+
+        <!-- --- Multi-detector status panel --- -->
+        <div id="detectors-out" hidden></div>
+
+        <!-- --- Saved history panel --- -->
+        <div id="history-out" hidden></div>
+
+        <!-- --- Detector result --- -->
+        <div id="detector-result" hidden>
+          <div class="dist-bars">
+            <div class="dist-row">
+              <span class="dist-label"><i class="dot dot-red"></i> AI-generated</span>
+              <div class="dist-track"><div class="dist-fill fill-red" id="dist-ai" style="width:0%"></div></div>
+              <b id="dist-ai-num">0%</b>
+            </div>
+            <div class="dist-row">
+              <span class="dist-label"><i class="dot dot-orange"></i> Mix-generated</span>
+              <div class="dist-track"><div class="dist-fill fill-orange" id="dist-mix" style="width:0%"></div></div>
+              <b id="dist-mix-num">0%</b>
+            </div>
+            <div class="dist-row">
+              <span class="dist-label"><i class="dot dot-green"></i> Human-written</span>
+              <div class="dist-track"><div class="dist-fill fill-green" id="dist-human" style="width:0%"></div></div>
+              <b id="dist-human-num">0%</b>
+            </div>
+          </div>
+
+          <div class="gauge-wrap">
+            <div class="gauge" id="gauge" role="img" aria-label="human score gauge">
+              <svg viewBox="0 0 120 120">
+                <circle class="gauge-track" cx="60" cy="60" r="52"></circle>
+                <circle class="gauge-fill" id="gauge-fill" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <div class="gauge-label">
+                <strong id="gauge-num">–</strong>
+                <span id="gauge-cap">human</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="verdict-banner" id="verdict-banner" hidden></div>
+          <p class="hint" id="detector-caveat" hidden></p>
+          <p class="hint" id="detector-note"></p>
+
+          <div class="det-section">
+            <h3>Highlighted AI-generated / paraphrased sentences</h3>
+            <ul class="det-sentences" id="det-sentences"></ul>
+          </div>
+        </div>
+
+        <!-- --- Humanizer result --- -->
+        <div id="analysis" hidden>
+          <div class="score-row">
+            <div class="score-wrap">
+              <div class="score-box">
+                <span class="score-num" id="score-num">–</span>
+              </div>
+              <span class="score-cap">naturalness</span>
+            </div>
+            <div class="score-wrap" id="plain-score-wrap" hidden>
+              <div class="score-box plain-score-box">
+                <span class="score-num" id="plain-score-num">–</span>
+              </div>
+              <span class="score-cap">plain register</span>
+            </div>
+            <div class="issues">
+              <h3>What made it sound robotic</h3>
+              <ul id="issues"></ul>
+            </div>
+          </div>
+
+          <!-- Plain register meter: how much of the result is built from the
+               everyday vocabulary humans actually use (verified memory). -->
+          <div class="plain-meter" id="plain-meter" hidden>
+            <div class="plain-meter-head">
+              <div class="plain-meter-title">
+                <strong>Plain register</strong>
+                <span class="plain-meter-desc">everyday words humans actually use — verified against a corpus of real writing</span>
+              </div>
+              <span class="metric-delta" id="plain-meter-delta"></span>
+            </div>
+            <div class="plain-meter-bars">
+              <div class="plain-meter-bar">
+                <span>before</span>
+                <div class="dist-track"><div class="dist-fill fill-before" id="plain-meter-before-fill" style="width:0%"></div></div>
+                <b id="plain-meter-before">0</b>
+              </div>
+              <div class="plain-meter-bar">
+                <span>after</span>
+                <div class="dist-track"><div class="dist-fill fill-after" id="plain-meter-after-fill" style="width:0%"></div></div>
+                <b id="plain-meter-after">0</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="metrics" id="metrics" hidden>
+            <h3>Detection signals <small>before → after (higher = more human)</small></h3>
+            <div class="metrics-grid" id="metrics-grid"></div>
+            <p class="hint" id="metrics-note"></p>
+          </div>
+
+          <div class="compare">
+            <h3>Side by side <span class="legend"><span class="swatch sw-del"></span> removed &nbsp; <span class="swatch sw-add"></span> added</span></h3>
+            <div class="compare-grid">
+              <div class="compare-col">
+                <h4>Before</h4>
+                <pre id="before"></pre>
+              </div>
+              <div class="compare-col">
+                <h4>After <small id="llm-note"></small></h4>
+                <p id="llm-warn" class="llm-warn" hidden></p>
+                <p id="plan-note" class="llm-warn" hidden></p>
+                <pre id="after"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="export-bar" id="export-bar" hidden>
+            <span class="export-label">Download result:</span>
+            <button type="button" class="ghost small" data-fmt="txt">.txt</button>
+            <button type="button" class="ghost small" data-fmt="docx">.docx</button>
+            <button type="button" class="ghost small" data-fmt="pdf">.pdf</button>
+          </div>
+        </div>
+
+        <div id="result-empty" class="result-empty">
+          <div class="empty-art">📄✓</div>
+          <p>Nothing yet — run a check and the result lands here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= Humanizer controls & extras ======================= -->
+    <section class="controls-bar" id="humanizer-controls" hidden>
+      <span class="steps" id="steps" hidden>
+        <span class="step" data-step="0">Analyzing</span><span class="sep">→</span>
+        <span class="step" data-step="1">Rewriting</span><span class="sep">→</span>
+        <span class="step" data-step="2">Verifying</span>
+      </span>
+      <span class="stream-detail" id="stream-detail" hidden></span>
+      <label for="style">Style
+        <select id="style"></select>
+        <small id="style-desc"></small>
+      </label>
+      <label for="provider">Model
+        <select id="provider"></select>
+      </label>
+      <label>Intensity
+        <span class="intensity-row">
+          <input type="range" id="intensity" min="0" max="100" step="5" value="60">
+          <output id="intensity-out" for="intensity">Medium</output>
+        </span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="use-llm" checked>
+        Use LLM backend (if configured)
+      </label>
+      <label class="check" title="Stream the rewrite word-by-word as it is generated, instead of waiting for the whole result">
+        <input type="checkbox" id="stream" checked>
+        Stream live
+      </label>
+      <label class="check" title="Routes the rewrite through a 4-hop translation chain (English → Chinese → Japanese → Finnish → English) across two different engines — the strongest structural disruption, but noticeably slower.">
+        <input type="checkbox" id="deep">
+        Deep humanize <small>(translation chain)</small>
+      </label>
+      <button type="button" class="ghost small" id="vary-btn" title="Run again with a different seed — different word choices and rhythm">↻ Vary</button>
+      <button type="button" class="primary" id="run-humanize">Naturalize</button>
+    </section>
+
+    <section class="batch" id="humanizer-extras" hidden>
+      <h3>Batch mode</h3>
+      <p class="hint">Paste one document per blank line. Each becomes its own result.</p>
+      <textarea id="batch-input" rows="6" placeholder="Document one&#10;&#10;Document two&#10;&#10;Document three"></textarea>
+      <button id="run-batch" class="primary">Naturalize batch</button>
+      <div id="batch-out"></div>
+
+      <h3 style="margin-top:26px">Plagiarism / similarity check</h3>
+      <p class="hint">Compares your text against reference sources (paste them below). Catches verbatim copying before it ever reaches Turnitin — it can only see the sources you provide, not the whole internet.</p>
+      <div class="plag-grid">
+        <label>Text to check
+          <textarea id="plag-text" rows="6" placeholder="Paste the document you want to check…"></textarea>
+        </label>
+        <label>Reference sources <small>(one per blank line)</small>
+          <textarea id="plag-refs" rows="6" placeholder="Paste the original sources / articles to compare against…"></textarea>
+        </label>
+      </div>
+      <button id="run-plag" class="primary">Check similarity</button>
+      <div id="plag-out"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ======================= Plan modal ======================= -->
+<div class="modal-backdrop" id="plan-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
+    <h3 id="plan-modal-title">🚀 Naturalizer plans</h3>
+    <p class="sub">Start free with the detector and deterministic humanizer; go Pro for the full rewriting engine.</p>
+    <table>
+      <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
+      <tr><td>AI detector + naturalness score</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Deterministic humanizer</td><td class="yes">✓ 1,000 words/day</td><td class="yes">✓ unlimited</td></tr>
+      <tr><td>LLM rewrite (Claude / CX gateway / OpenAI / Gemini / Qwen…)</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Perfect humanize — live feedback loop</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Deep humanize — 4-hop translation chain</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Batch mode</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Full rewrite intensity + run-to-run variety</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Sentence-level re-humanize</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Plagiarism / similarity check</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+    </table>
+    <p class="modal-note" id="plan-modal-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="ghost small" id="plan-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<footer class="wrap">
+  <p>Deterministic core — no API key required. Add Claude (<code>HINAA_CLAUDE_API_KEY</code>) or a CX gateway (<code>CX_GATEWAY_API_KEY</code>) in <code>.env.local</code> to enable the LLM rewrite path, then pick the model above.</p>
+</footer>
+
+<script nonce="__CSP_NONCE__">
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+const SAMPLE = `In today's fast-paced world, it is important to note that technology plays a crucial role in our daily lives. Furthermore, the ever-evolving landscape of digital tools continues to transform the way we work and communicate. Moreover, it is essential to highlight that organizations must leverage cutting-edge solutions to remain competitive. Additionally, the realm of artificial intelligence offers a plethora of opportunities for businesses to unlock new levels of efficiency. In conclusion, it is important to remember that navigating the complexities of modern technology requires a robust and holistic approach. Overall, the journey toward digital transformation underscores the paramount importance of adaptability.`;
+
+const HUMAN_SAMPLE = `The wiring came loose behind the counter, so we shut the power off before touching anything. Once the new breaker was in, the lights came back on without a flicker. We left the panel open for an hour just to make sure nothing else was drifting, and then closed it up and went home.`;
+
+let lastResult = null;
+let lastDetector = null;
+let historyCache = null;
+let maxUploadBytes = 10 * 1024 * 1024;
+let mode = "detector";
+let plan = { name: "free", features: {} };
+let intensityPct = 60;       // 0-100 slider value
+let planIntensityCap = 100;  // % cap from the active plan (Free caps at 50%)
+let seedCounter = 0;         // bumped by "Vary" / "Humanize again" / sentence re-humanize
+
+const SERVER_DOWN_MSG =
+  "Can't reach the server — it's stopped or unreachable. Restart it with start.bat (or python server.py), then refresh this page.";
+
+function showError(msg) {
+  const banner = $("err-banner");
+  banner.textContent = msg;
+  banner.hidden = false;
+  banner.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function requestFailed(e) {
+  return e instanceof TypeError;
+}
+
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ---------------------------------------------------------------- modes
+function setMode(m) {
+  mode = m;
+  const isDet = m === "detector";
+  $("tab-humanizer").classList.toggle("active", !isDet);
+  $("tab-detector").classList.toggle("active", isDet);
+  $("nav-humanizer").classList.toggle("active", !isDet);
+  $("nav-detector").classList.toggle("active", isDet);
+  $("humanizer-controls").hidden = isDet;
+  $("humanizer-extras").hidden = isDet;
+  $("run").textContent = isDet ? "Detect AI" : "Naturalize";
+  // Reset the result view.
+  $("detector-result").hidden = true;
+  $("analysis").hidden = true;
+  $("result-empty").hidden = false;
+  $("plain-meter").hidden = true;
+  $("plain-score-wrap").hidden = true;
+  $("metrics").hidden = true;
+  $("bench-out").hidden = true;
+  $("history-out").hidden = true;
+  $("hint").textContent = isDet
+    ? "Paste a draft and hit Detect AI — or upload a file. The detector tags every sentence as AI / mixed / human and gives an overall verdict."
+    : "Tip: the sample below is stuffed with common AI tells. Hit Naturalize to see what happens.";
+  if ($("input").value === SAMPLE && isDet) $("input").value = SAMPLE;
+  updateWordCount();
+}
+
+function updateWordCount() {
+  const n = $("input").value.trim().split(/\s+/).filter(Boolean).length;
+  $("word-count").textContent = n + " word" + (n === 1 ? "" : "s");
+}
+
+// ---------------------------------------------------------------- init
+async function init() {
+  const styleSel = $("style");
+  $("input").value = SAMPLE;
+  let status;
+  try {
+    const res = await fetch("/api/status");
+    status = await res.json();
+  } catch {
+    showError(SERVER_DOWN_MSG);
+    return;
+  }
+  status.styles.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = status.style_labels[name];
+    styleSel.appendChild(opt);
+  });
+  $("style-desc").textContent = status.style_labels[status.styles[0]];
+  styleSel.addEventListener("change", () => {
+    $("style-desc").textContent = status.style_labels[styleSel.value];
+  });
+
+  // Model picker from /api/status providers.
+  const provSel = $("provider");
+  (status.providers || [{ name: "auto", label: "Auto (first available)" }]).forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.label + (p.configured === false ? " (not configured)" : "");
+    opt.disabled = p.configured === false;
+    provSel.appendChild(opt);
+  });
+
+  const badge = $("llm-badge");
+  if (status.llm_configured) {
+    badge.textContent = status.llm_model ? `LLM · ${status.llm_model}` : "LLM enabled";
+    badge.classList.remove("badge-off");
+    badge.classList.add("badge-on");
+    badge.hidden = false;
+  } else {
+    badge.textContent = "LLM not configured — deterministic mode";
+    badge.hidden = false;
+  }
+  if (status.uploads && status.uploads.max_bytes) {
+    maxUploadBytes = status.uploads.max_bytes;
+  }
+
+  // Plan badge + intensity cap from the server.
+  if (status.plan) plan = status.plan;
+  const chip = $("plan-chip");
+  chip.textContent = (plan.label || plan.name || "free").toUpperCase();
+  chip.classList.toggle("pro", plan.name === "pro");
+  if (plan.features && plan.features.max_intensity != null) {
+    planIntensityCap = Math.round(plan.features.max_intensity * 100);
+  }
+  const slider = $("intensity");
+  slider.max = planIntensityCap;
+  if (intensityPct > planIntensityCap) intensityPct = planIntensityCap;
+  slider.value = intensityPct;
+  syncIntensityLabel();
+  $("input").addEventListener("input", () => { $("hint").textContent = ""; updateWordCount(); });
+  wireUpload();
+  wireTabs();
+  setMode("detector");
+}
+
+function wireTabs() {
+  $("tab-humanizer").addEventListener("click", () => setMode("humanizer"));
+  $("tab-detector").addEventListener("click", () => setMode("detector"));
+  $("nav-humanizer").addEventListener("click", () => setMode("humanizer"));
+  $("nav-detector").addEventListener("click", () => setMode("detector"));
+  $("collapse-sidebar").addEventListener("click", () => {
+    $("sidebar").classList.toggle("collapsed");
+  });
+  $("clear-input").addEventListener("click", () => { $("input").value = ""; updateWordCount(); });
+  $("copy-input").addEventListener("click", () => {
+    navigator.clipboard && navigator.clipboard.writeText($("input").value);
+  });
+  $("share-btn").addEventListener("click", () => {
+    const text = lastResult
+      ? (lastResult.rewritten || lastResult.original || "")
+      : $("input").value;
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+  });
+  $("download-pdf").addEventListener("click", () => download("pdf"));
+  $("vary-btn").addEventListener("click", varyResult);
+  $("again-btn").addEventListener("click", humanizeAgain);
+  $("bench-btn").addEventListener("click", runBench);
+  $("history-btn").addEventListener("click", runHistory);
+  $("perfect-btn").addEventListener("click", runPerfect);
+  $("compare-btn").addEventListener("click", runCompare);
+  $("detectors-btn").addEventListener("click", runDetectors);
+  $("upgrade-btn").addEventListener("click", openPlanModal);
+  $("plan-close").addEventListener("click", closePlanModal);
+  $("plan-modal").addEventListener("click", (e) => {
+    if (e.target === $("plan-modal")) closePlanModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("plan-modal").hidden) closePlanModal();
+  });
+  $("intensity").addEventListener("input", () => {
+    intensityPct = +$("intensity").value;
+    syncIntensityLabel();
+  });
+  // Sentence-level re-humanize: "↻ humanize" on a flagged sentence.
+  $("det-sentences").addEventListener("click", onSentenceAction);
+}
+
+// ---------------------------------------------------------------- plans & controls
+function syncIntensityLabel() {
+  const v = intensityPct;
+  const label = v <= 40 ? "Light" : (v <= 75 ? "Medium" : "Strong");
+  $("intensity-out").textContent = `${label} ${v}%`;
+}
+
+function currentIntensity() {
+  return Math.min(planIntensityCap, intensityPct) / 100;
+}
+
+function openPlanModal() {
+  const note = $("plan-modal-note");
+  if (plan.name === "pro") {
+    note.textContent = "Pro is active — you have the full humanizer. This local build reads NATURALIZER_PLAN=pro or any configured LLM in .env.local.";
+  } else {
+    note.textContent = "You're on the Free plan (1,000 words/day, deterministic only). Set NATURALIZER_PLAN=pro in the environment or configure an LLM in .env.local to unlock Pro features — no payment needed in this local build.";
+  }
+  $("plan-modal").hidden = false;
+}
+
+function closePlanModal() {
+  $("plan-modal").hidden = true;
+}
+
+// ---------------------------------------------------------------- animation
+let stepTimer = null;
+
+function setStep(i) {
+  const box = $("steps");
+  box.hidden = false;
+  box.querySelectorAll(".step").forEach((s, idx) => {
+    s.classList.toggle("active", idx === i);
+    s.classList.toggle("done", idx < i);
+  });
+}
+
+function startSteps() {
+  clearTimeout(stepTimer);
+  let i = 0;
+  setStep(0);
+  const tick = () => {
+    if (i < 2) { i += 1; setStep(i); stepTimer = setTimeout(tick, 420); }
+  };
+  stepTimer = setTimeout(tick, 420);
+}
+
+function finishSteps() {
+  clearTimeout(stepTimer);
+  const box = $("steps");
+  box.querySelectorAll(".step").forEach((s) => {
+    s.classList.remove("active");
+    s.classList.add("done");
+  });
+  setTimeout(() => { box.hidden = true; }, 800);
+}
+
+function typeInto(el, finalHtml, plainText) {
+  const words = (plainText || "").split(/\s+/).filter(Boolean);
+  if (!words.length) { el.innerHTML = finalHtml; return; }
+  const interval = Math.max(6, Math.min(24, 9000 / words.length));
+  el.classList.add("typing-caret");
+  let i = 0;
+  const tick = () => {
+    i += 1;
+    el.textContent = words.slice(0, i).join(" ");
+    if (i < words.length) {
+      setTimeout(tick, interval);
+    } else {
+      el.classList.remove("typing-caret");
+      el.innerHTML = finalHtml;
+    }
+  };
+  tick();
+}
+
+function animateScore(el, target) {
+  const t0 = performance.now();
+  const dur = 700;
+  const step = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ---------------------------------------------------------------- humanize again / vary
+function humanizeAgain() {
+  if (!lastResult) { showError("Run a humanize first, then hit this to go again."); return; }
+  const current = lastResult.llm_used
+    ? (lastResult.llm_rewritten || lastResult.rewritten)
+    : lastResult.rewritten;
+  if (!current) return;
+  $("input").value = current;
+  // Bump intensity so each pass restructures a bit more.
+  intensityPct = Math.min(planIntensityCap, intensityPct + 15);
+  $("intensity").value = intensityPct;
+  syncIntensityLabel();
+  seedCounter += 1;
+  runOne();
+}
+
+function varyResult() {
+  seedCounter += 1;
+  runOne();
+}
+
+// ---------------------------------------------------------------- sentence re-humanize
+function spliceSentence(idx, rewritten) {
+  const value = $("input").value;
+  const parts = value.split(/(?<=[.!?])\s+(?=[A-Z0-9"'()])/);
+  if (!lastDetector || !lastDetector.sentences[idx]) return;
+  const original = lastDetector.sentences[idx].sentence;
+  let pos = parts.length === lastDetector.sentences.length ? idx : parts.indexOf(original);
+  if (pos === -1) { showError("Couldn't locate that sentence to replace it."); return; }
+  parts[pos] = rewritten.trim().replace(/[.!?]+$/, "") + ".";
+  $("input").value = parts.join(" ").trim();
+  $("editor-wrap").classList.remove("show-highlight");
+  $("edit-toggle").hidden = true;
+  runDetect();
+}
+
+async function onSentenceAction(e) {
+  const btn = e.target.closest(".sent-action");
+  if (!btn || !lastDetector) return;
+  const idx = +btn.dataset.idx;
+  const sentence = lastDetector.sentences[idx] && lastDetector.sentences[idx].sentence;
+  if (!sentence) return;
+  btn.disabled = true;
+  btn.textContent = "working…";
+  try {
+    const res = await fetch("/api/naturalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: sentence,
+        style: $("style").value || "academic",
+        use_llm: $("use-llm").checked,
+        deep: $("deep").checked,
+        provider: $("provider").value,
+        intensity: currentIntensity(),
+        seed: ++seedCounter,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || "Re-humanize failed");
+      btn.disabled = false;
+      btn.textContent = "↻ humanize";
+      return;
+    }
+    const rewritten = data.llm_used ? (data.llm_rewritten || data.rewritten) : data.rewritten;
+    spliceSentence(idx, rewritten);
+  } catch (err) {
+    showError("Re-humanize failed: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "↻ humanize";
+  }
+}
+
+// ---------------------------------------------------------------- detector accuracy benchmark
+async function runBench() {
+  const btn = $("bench-btn");
+  btn.disabled = true;
+  btn.textContent = "Measuring…";
+  const out = $("bench-out");
+  out.hidden = true;
+  try {
+    const res = await fetch("/api/benchmark");
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Benchmark failed"); return; }
+    const d = data.detector, h = data.humanizer;
+    const pct = (x) => Math.round((x || 0) * 100) + "%";
+    const styleCards = (h.by_style || []).map((s) => {
+      const label = (s.style || s.name || "").replace(/^./, (c) => c.toUpperCase());
+      return `
+        <div class="bench-card style-card">
+          <b>${esc(label)}</b>
+          <span class="style-before-after">${s.before} → ${s.after}</span>
+          <span class="style-lift ${s.lift > 0 ? "ok" : ""}">+${s.lift} lift · ${pct(s.floor_75_reached)} clear</span>
+        </div>`;
+    }).join("");
+    out.innerHTML = `
+      <div class="bench">
+        <h3>Detector &amp; humanizer accuracy <small>(labeled corpus)</small></h3>
+        <div class="bench-grid">
+          <div class="bench-card"><b>${pct(d.accuracy)}</b><span>accuracy</span></div>
+          <div class="bench-card"><b>${pct(d.precision)}</b><span>precision</span></div>
+          <div class="bench-card"><b>${pct(d.recall)}</b><span>recall</span></div>
+          <div class="bench-card"><b>${pct(d.f1)}</b><span>F1 score</span></div>
+          <div class="bench-card"><b>${h.mean_before} → ${h.mean_after}</b><span>naturalness before → after</span></div>
+          <div class="bench-card"><b>+${h.mean_lift}</b><span>humanizer lift</span></div>
+          <div class="bench-card"><b>${pct(h.floor_75_reached)}</b><span>clear 75 floor</span></div>
+        </div>
+        ${styleCards ? `<h4 class="bench-sub">Before → after by writing style</h4><div class="bench-grid style-grid">${styleCards}</div>` : ""}
+        <p class="bench-note">${esc(data.note)}</p>
+      </div>`;
+    out.hidden = false;
+    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Benchmark failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "📊 Accuracy";
+  }
+}
+
+// ---------------------------------------------------------------- perfect humanize (feedback loop)
+async function runPerfect() {
+  const text = $("input").value.trim();
+  if (!text) { showError("Paste some text to humanize first."); return; }
+  const btn = $("perfect-btn");
+  btn.disabled = true;
+  btn.textContent = "Looping…";
+  startSteps();
+  try {
+    const res = await fetch("/api/perfect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        style: $("style").value || "academic",
+        provider: $("provider").value || "auto",
+        intensity: currentIntensity(),
+        seed: seedCounter,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      finishSteps();
+      showError(data.error || "Perfect humanize failed");
+      if (res.status === 402) openPlanModal();
+      return;
+    }
+    renderPerfect(data, text);
+    refreshHistory();
+  } catch (e) {
+    finishSteps();
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Perfect humanize failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⚡ Perfect humanize";
+  }
+}
+
+function renderPerfect(p, originalText) {
+  finishSteps();
+  $("result-empty").hidden = true;
+  const out = $("perfect-out");
+  const scores = p.scores || [];
+  const trail = scores
+    .map((s, i) => `<span class="pass-score${i === scores.length - 1 ? " pass-final" : ""}">${s}</span>`)
+    .join(" → ");
+  const passCount = Math.max(1, p.passes || 1);
+  const converged = scores.length && scores[scores.length - 1] >= (p.floor || 80);
+  const method = p.llm_used
+    ? `LLM (${p.method || "single"})`
+    : (p.method || "deterministic");
+  const liveScores = (p.live_scores || []).reduce((m, r) => { m[r.name] = r; return m; }, {});
+  const detectors = (p.detectors || []).map((d) => detRow(d, liveScores)).join("");
+  out.innerHTML = `
+    <div class="bench">
+      <h3>⚡ Perfect humanize <small>live feedback loop</small></h3>
+      <div class="perfect-trail">
+        <span class="pass-cap">naturalness per pass</span>
+        <div class="pass-scores">${trail}</div>
+        <p class="pass-status ${converged ? "ok" : "warn"}">
+          ${converged
+            ? `Converged after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b> — the re-scan now reads human (floor ${p.floor || 80}).`
+            : `Maxed out after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b> — best score ${scores[scores.length - 1] ?? "—"} (floor ${p.floor || 80}). Try a higher intensity or the LLM path.`}
+        </p>
+        <p class="pass-method">engine: ${esc(method)}</p>
+        ${p.warning ? `<p class="llm-warn">⚠ ${esc(p.warning)}</p>` : ""}
+        ${(p.fact_issues || []).length
+          ? `<p class="llm-warn">⚠ Fact check: ${esc((p.fact_issues || []).map(i => i.message).join("; "))} — double-check the figures.</p>`
+          : ""}
+      </div>
+      <h4 class="det-head">Detector coverage</h4>
+      <div class="det-grid">${detectors}</div>
+      <p class="bench-note">The loop rewrites, re-scans with every configured detector, and feeds remaining tells back into the next pass. Add third-party detector keys (GPTZero, ZeroGPT, Originality.ai) to <code>.env.local</code> to include them in the loop.</p>
+    </div>`;
+  out.hidden = false;
+  out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  // Show the converged text in the After pane.
+  $("analysis").hidden = false;
+  $("detector-result").hidden = true;
+  $("export-bar").hidden = true;
+  $("before").textContent = originalText || "";
+  const after = $("after");
+  after.textContent = "";
+  typeInto(after, esc(p.text || ""), p.text || "");
+  $("llm-note").textContent = p.llm_used ? `feedback loop (${p.method || "single"})` : "feedback loop (deterministic)";
+  $("llm-warn").hidden = true;
+  $("plan-note").hidden = true;
+  const scoreNum = $("score-num");
+  animateScore(scoreNum, scores[scores.length - 1] ?? 0);
+  const box = document.querySelector(".score-box");
+  box.style.setProperty("--score", scores[scores.length - 1] ?? 0);
+  const scoreLabel = document.querySelector("#result-card .card-head h2");
+  if (scoreLabel) scoreLabel.textContent = "Result";
+  // The loop result carries the same verified human-writing memory metrics
+  // as the single-shot path — show the plain-register meter for it too.
+  renderPlainMeter(p);
+  refreshHistory();
+}
+
+// ---------------------------------------------------------------- compare panel
+async function runCompare() {
+  const text = $("input").value.trim();
+  if (!text) { showError("Paste some text to humanize first."); return; }
+  const btn = $("compare-btn");
+  btn.disabled = true;
+  btn.textContent = "Comparing…";
+  startSteps();
+  try {
+    const res = await fetch("/api/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        style: $("style").value || "academic",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      finishSteps();
+      showError(data.error || "Compare failed");
+      return;
+    }
+    renderCompare(data);
+  } catch (e) {
+    finishSteps();
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Compare failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⚖ Compare";
+  }
+}
+
+function renderCompare(data) {
+  finishSteps();
+  $("result-empty").hidden = true;
+  const out = $("compare-out");
+  const floor = data.floor || 75;
+  const candidates = data.candidates || [];
+  const rows = candidates.map((c, i) => {
+    const verdict = c.best
+      ? '<span class="det-state det-live">BEST</span>'
+      : (c.score >= floor
+          ? '<span class="det-state det-live">pass</span>'
+          : '<span class="det-state det-off">below floor</span>');
+    const lost = c.fact_lost
+      ? `<span class="cmp-facts">⚠ ${c.fact_lost} fact(s) lost</span>`
+      : "";
+    const noChange = c.no_change
+      ? ' <small style="color:var(--muted)">(unchanged)</small>'
+      : "";
+    return `<div class="cmp-row${c.best ? " cmp-best" : ""}">
+      <span class="cmp-rank">${c.rank}</span>
+      <div class="cmp-main">
+        <span class="cmp-name">${esc(c.label || c.provider)}${noChange}</span>
+        <span class="cmp-method">${esc(c.method || "")}</span>
+        <span class="cmp-score">${c.score}</span>
+        <span class="cmp-plain">plain ${c.plain}</span>
+        ${lost}${verdict}
+        <button type="button" class="ghost small" data-i="${i}" title="Load this version into the After pane">Use</button>
+      </div>
+    </div>`;
+  }).join("");
+  const blocked = (data.blocked || []).map((b) =>
+    `<div class="det-row"><span class="det-name">${esc(b.label || b.provider)}</span><span class="det-state det-off">${esc(b.blocked)}</span><span class="det-note">${esc(b.note || "")}</span></div>`
+  ).join("");
+  out.innerHTML = `
+    <div class="bench">
+      <h3>⚖ Compare <small>every humanizer, one input</small></h3>
+      ${rows ? `<div class="cmp-list">${rows}</div>` : '<p class="cmp-empty">No candidates produced output.</p>'}
+      ${blocked ? `<h4 class="det-head">Not available this run</h4><div class="det-grid">${blocked}</div>` : ""}
+      <p class="bench-note">The same input is run through every configured humanizer and ranked by the shared floor gate: highest naturalness that clears the floor, then plainest register, then fewest lost facts. Add <code>STEALTHGPT_API_KEY</code> / <code>UNDETECTABLE_API_KEY</code> to <code>.env.local</code> to include those live. Click <b>Use</b> to load a version into the After pane.</p>
+    </div>`;
+  out.hidden = false;
+  out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  out.querySelectorAll("[data-i]").forEach((btn) => {
+    const c = candidates[Number(btn.dataset.i)];
+    if (!c) return;
+    btn.addEventListener("click", () => useTextInAfter(c, data));
+  });
+}
+
+function useTextInAfter(c, data) {
+  // Load a compared version into the After pane, with its score and
+  // plain-register meter, so the winner is one click from the result.
+  $("analysis").hidden = false;
+  $("detector-result").hidden = true;
+  $("export-bar").hidden = true;
+  $("before").textContent = $("input").value.trim() || "";
+  const after = $("after");
+  after.textContent = "";
+  typeInto(after, esc(c.text || ""), c.text || "");
+  $("llm-note").textContent = "compare: " + (c.label || c.provider);
+  $("llm-warn").hidden = true;
+  $("plan-note").hidden = true;
+  animateScore($("score-num"), c.score || 0);
+  const box = document.querySelector(".score-box");
+  if (box) box.style.setProperty("--score", c.score || 0);
+  const scoreLabel = document.querySelector("#result-card .card-head h2");
+  if (scoreLabel) scoreLabel.textContent = "Result — compare pick";
+  renderPlainMeter({
+    metrics: {
+      plain_register: {
+        before: ((data.original || {}).plain) ?? 0,
+        after: c.plain ?? 0,
+      },
+    },
+  });
+}
+
+// ---------------------------------------------------------------- detector status panel
+function detRow(d, liveScores) {
+  const score = liveScores && liveScores[d.name];
+  const state = d.live && d.configured
+    ? (score !== undefined
+        ? (score.error
+          ? `<span class="det-state det-off">error</span>`
+          : `<span class="det-state det-live">${esc(score.verdict)} ${score.score}%</span>`)
+        : "<span class='det-state det-live'>live</span>")
+    : (d.configured ? "<span class='det-state'>configured</span>" : "<span class='det-state det-off'>not configured</span>");
+  const note = score && score.error ? esc(score.error) : (d.note ? esc(d.note) : "");
+  return `<div class="det-row"><span class="det-name">${esc(d.label)}</span>${state}<span class="det-note">${note}</span></div>`;
+}
+
+async function runDetectors() {
+  const out = $("detectors-out");
+  out.hidden = true;
+  try {
+    const res = await fetch("/api/detectors");
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Detectors check failed"); return; }
+    const dets = data.detectors || [];
+    // Live-scan the current input with every configured third-party
+    // detector, so the panel shows real GPTZero / ZeroGPT scores.
+    let liveScores = null;
+    const text = ($("input") || {}).value || "";
+    if (text.trim() && dets.some((d) => d.live && d.configured)) {
+      const scanRes = await fetch("/api/detectors/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (scanRes.ok) {
+        const scanData = await scanRes.json();
+        liveScores = {};
+        (scanData.results || []).forEach((r) => { liveScores[r.name] = r; });
+      }
+    }
+    const rows = dets.map((d) => detRow(d, liveScores)).join("");
+    out.innerHTML = `
+      <div class="bench">
+        <h3>🔌 Detector status</h3>
+        <div class="det-grid">${rows}</div>
+        <p class="bench-note">The built-in detector is always live. GPTZero and ZeroGPT light up <b>live</b> when their API key is in <code>.env.local</code> — their %AI score for the current text appears here. Originality.ai needs its paid API; Turnitin has no developer API.</p>
+      </div>`;
+    out.hidden = false;
+    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Detectors check failed: " + e.message);
+  }
+}
+
+// ---------------------------------------------------------------- history
+async function refreshHistory() {
+  try {
+    const res = await fetch("/api/history?limit=50");
+    if (res.ok) historyCache = (await res.json()).entries || [];
+  } catch (e) { /* the panel fetches fresh on open; keep the old cache */ }
+}
+
+async function runHistory() {
+  const out = $("history-out");
+  const btn = $("history-btn");
+  if (!out.hidden) { out.hidden = true; return; }  // toggle closed
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/history?limit=50");
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "History failed"); return; }
+    const entries = data.entries || [];
+    historyCache = entries;
+    if (!entries.length) {
+      out.innerHTML = `<div class="bench"><h3>🕘 History</h3><p class="bench-note">No saved runs yet — every Naturalize / ⚡ Perfect run is saved here with its input, rewrite and score.</p></div>`;
+    } else {
+      out.innerHTML = `
+        <div class="bench">
+          <div class="history-head">
+            <h3>🕘 History <small>${entries.length} saved</small></h3>
+            <button type="button" class="ghost small" id="history-clear">Clear all</button>
+          </div>
+          <div class="history-list">${entries.map(historyRow).join("")}</div>
+        </div>`;
+      $("history-clear").addEventListener("click", clearHistory);
+    }
+    out.hidden = false;
+    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "History failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function historyRow(e) {
+  const styleLabel = (e.style || "academic").replace(/^./, (c) => c.toUpperCase());
+  const modeTag = e.mode === "perfect" ? "⚡ perfect" : (e.mode === "batch" ? "batch" : "naturalize");
+  const raw = e.input || "";
+  const flat = raw.replace(/\s+/g, " ").trim();
+  const snippet = flat.slice(0, 90) + (flat.length > 90 ? "…" : "");
+  const tags = [esc(modeTag)];
+  if (e.llm_used) tags.push(esc(e.provider || "llm"));
+  if (e.passes) tags.push(`${e.passes} pass${e.passes === 1 ? "" : "es"}`);
+  return `
+    <details class="history-item">
+      <summary>
+        <span class="history-score">${e.score}/100</span>
+        <span class="history-snippet">${esc(snippet)}</span>
+        <span class="history-meta">${esc(e.iso || "")} · ${esc(styleLabel)} · ${tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}</span>
+      </summary>
+      <div class="history-body">
+        <div class="compare-grid">
+          <div class="compare-col"><h4>Input</h4><pre>${esc(e.input)}</pre></div>
+          <div class="compare-col"><h4>Rewrite</h4><pre>${esc(e.output)}</pre></div>
+        </div>
+        <div class="history-actions">
+          <button type="button" class="ghost small" data-act="load" data-id="${esc(e.id)}">Use input</button>
+          <button type="button" class="ghost small" data-act="copy" data-id="${esc(e.id)}">Copy rewrite</button>
+          <button type="button" class="ghost small" data-act="delete" data-id="${esc(e.id)}">Delete</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+async function clearHistory() {
+  if (!confirm("Clear all saved history?")) return;
+  try {
+    const res = await fetch("/api/history/clear", { method: "POST" });
+    if (res.ok) runHistory();
+  } catch (e) { showError("Clear failed: " + e.message); }
+}
+
+$("history-out").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest && ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const entry = (historyCache || []).find((e) => e.id === btn.dataset.id);
+  if (act === "load" && entry) {
+    $("input").value = entry.input || "";
+    updateWordCount();
+    setMode("humanizer");
+    $("content-card").scrollIntoView({ behavior: "smooth" });
+  } else if (act === "copy" && entry) {
+    if (navigator.clipboard) navigator.clipboard.writeText(entry.output || "");
+  } else if (act === "delete") {
+    try {
+      const res = await fetch("/api/history/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: btn.dataset.id }),
+      });
+      if (res.ok) runHistory();
+      else showError("Delete failed");
+    } catch (e) { showError("Delete failed: " + e.message); }
+  }
+});
+
+// ---------------------------------------------------------------- detector
+function renderDetector(d) {
+  lastDetector = d;
+  d.sentences.forEach((s, i) => { s.idx = i; });
+  $("result-empty").hidden = true;
+  $("analysis").hidden = true;
+  const det = $("detector-result");
+  det.hidden = false;
+
+  $("dist-ai").style.width = d.distribution.ai + "%";
+  $("dist-mix").style.width = d.distribution.mix + "%";
+  $("dist-human").style.width = d.distribution.human + "%";
+  $("dist-ai-num").textContent = d.distribution.ai + "%";
+  $("dist-mix-num").textContent = d.distribution.mix + "%";
+  $("dist-human-num").textContent = d.distribution.human + "%";
+
+  // Gauge.
+  const human = d.distribution.human;
+  $("gauge-num").textContent = human + "%";
+  $("gauge-cap").textContent = "human";
+  $("gauge-fill").style.strokeDashoffset = 327 - (327 * human) / 100;
+  const gaugeCls = human >= 60 ? "g-green" : (human >= 35 ? "g-orange" : "g-red");
+  $("gauge").className = "gauge " + gaugeCls;
+
+  // Verdict banner.
+  const banner = $("verdict-banner");
+  banner.hidden = false;
+  const verdict = d.verdict;
+  banner.className = "verdict-banner " + (verdict === "human" ? "v-human" : (verdict === "mixed" ? "v-mixed" : "v-ai"));
+  if (verdict === "human") {
+    banner.innerHTML = `Our detector is <strong>highly confident</strong> that the text is <strong>written entirely by a human</strong> (${d.confidence}% confidence).`;
+  } else if (verdict === "mixed") {
+    banner.innerHTML = `The text looks <strong>mixed</strong> — some passages read AI-generated, others human (${d.confidence}% confidence).`;
+  } else {
+    banner.innerHTML = `Our detector is <strong>highly confident</strong> that the text is <strong>AI-generated</strong> (${d.confidence}% confidence).`;
+  }
+  // Honest abstention + passage-level evidence (the windowed signal real
+  // detectors weigh): a short/list-heavy sample gets a caveat, and each
+  // contiguous AI region gets named.
+  const caveats = [];
+  if (d.abstain && d.abstain.length) {
+    caveats.push(`<em>Low confidence:</em> ${d.abstain.join("; ")}.`);
+  }
+  if (d.regions && d.regions.length) {
+    caveats.push(`<em>AI passages:</em> ${d.regions.length} block${d.regions.length === 1 ? "" : "s"} of AI-tagged sentences (${d.regions.map((r) => `sentences ${r.start + 1}–${r.end + 1}`).join(", ")}).`);
+  }
+  if (caveats.length) {
+    const caveatEl = $("detector-caveat");
+    caveatEl.hidden = false;
+    caveatEl.innerHTML = caveats.join(" ");
+  }
+  $("detector-note").textContent = d.word_count
+    ? `${d.word_count} words · naturalness ${d.score}/100 on the same local signals (a heuristic, not a third-party detector).`
+    : "";
+
+  // Sentence highlights in the content card.
+  const hl = $("highlighted");
+  hl.innerHTML = d.sentences.map((s) => {
+    const cls = s.label === "human" ? "sent-human" : (s.label === "mix" ? "sent-mix" : "sent-ai");
+    return `<span class="sent ${cls}">${esc(s.sentence)}</span> `;
+  }).join("");
+  $("editor-wrap").classList.add("show-highlight");
+  $("edit-toggle").hidden = false;
+
+  // Detector sentence list in the result card.
+  const list = $("det-sentences");
+  list.innerHTML = "";
+  const flagged = d.sentences.filter((s) => s.label !== "human");
+  if (!flagged.length) {
+    list.innerHTML = `<li class="det-none"><div class="det-empty-art">📄✓</div><span>No AI-generated sentences detected.</span></li>`;
+  } else {
+    flagged.forEach((s) => {
+      const li = document.createElement("li");
+      li.className = "det-sent " + (s.label === "ai" ? "ai" : "mix");
+      li.innerHTML = `<span class="det-badge">${s.label === "ai" ? "AI" : "MIX"}</span> <span>${esc(s.sentence)}</span> <small>${esc(s.issues.join(", "))}</small> <button type="button" class="sent-action" data-idx="${s.idx}">↻ humanize</button>`;
+      list.appendChild(li);
+    });
+  }
+}
+
+async function runDetect() {
+  const text = $("input").value.trim();
+  if (!text) { showError("Paste some text to check first."); return; }
+  const btn = $("run");
+  btn.disabled = true;
+  btn.textContent = "Detecting…";
+  try {
+    const res = await fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, style: $("style").value || "academic" }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Detect failed"); return; }
+    renderDetector(data);
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Detect failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Detect AI";
+  }
+}
+
+// ---------------------------------------------------------------- diff pane
+function renderDiffPane(ops, mode) {
+  if (!ops || !ops.length) return "";
+  let html = "";
+  let runCls = "";
+  let runText = "";
+  const flush = () => {
+    if (!runText) return;
+    const core = runText.replace(/\s+$/, "");
+    const ws = runText.slice(core.length);
+    if (core) html += `<span class="diff-${runCls}">${esc(core)}</span>`;
+    html += esc(ws);
+    runCls = "";
+    runText = "";
+  };
+  for (const op of ops) {
+    if (op.type === "same") {
+      flush();
+      html += esc(op.text);
+      continue;
+    }
+    const shown = (mode === "before" && op.type === "del") ||
+                  (mode === "after" && op.type === "add");
+    if (!shown) {
+      flush();
+      continue;
+    }
+    if (runCls === op.type) {
+      runText += op.text;
+    } else {
+      flush();
+      runCls = op.type;
+      runText = op.text;
+    }
+  }
+  flush();
+  return html;
+}
+
+const METRIC_LABELS = {
+  perplexity: ["Randomness", "how unpredictable the word sequence is — AI text is more predictable"],
+  burstiness: ["Sentence variety", "how much sentence length varies — AI output is uniform"],
+  syntactic: ["Formulaic patterns", "how free of filler / cliché / hedge sentence shapes"],
+  coherence: ["Flow & cohesion", "how well consecutive sentences hang together"],
+  word_choice: ["Word choice", "how predictably words are picked — AI over-uses rare formal vocabulary, people use common words"],
+};
+
+function renderMetrics(r) {
+  const m = r.metrics;
+  const box = $("metrics");
+  if (!m || !m.before || !m.after) { box.hidden = true; return; }
+  const grid = $("metrics-grid");
+  grid.innerHTML = "";
+  // The verified human-writing memory: how much of the text is built from
+  // the everyday vocabulary real people actually use (1.0 = reads like the
+  // verified human corpus). Rendered as a 0-100 bar alongside the signals.
+  const pr = m.plain_register || {};
+  if (pr.before !== undefined && pr.after !== undefined) {
+    const pb = Math.round((pr.before || 0) * 100);
+    const pa = Math.round((pr.after || 0) * 100);
+    const pd = pa - pb;
+    const pdHtml = pd >= 0
+      ? `<span class="metric-delta up">▲ +${pd}</span>`
+      : `<span class="metric-delta down">▼ −${Math.abs(pd)}</span>`;
+    const cell = document.createElement("div");
+    cell.className = "metric";
+    cell.innerHTML = `
+      <div class="metric-head"><strong>Plain register</strong>${pdHtml}</div>
+      <div class="metric-desc">everyday words humans actually use (verified memory) — higher = plainer, more human</div>
+      <div class="metric-bars">
+        <div class="metric-bar"><span>before</span><div class="track"><div class="fill" style="width:${pb}%"></div></div><b>${pb}</b></div>
+        <div class="metric-bar"><span>after</span><div class="track"><div class="fill fill-after" style="width:${pa}%"></div></div><b>${pa}</b></div>
+      </div>`;
+    grid.appendChild(cell);
+  }
+  for (const [key, [label, desc]] of Object.entries(METRIC_LABELS)) {
+    const b = m.before[key];
+    const a = m.after[key];
+    const bTxt = b === null || b === undefined ? "—" : Math.round(b);
+    const aTxt = a === null || a === undefined ? "—" : Math.round(a);
+    const delta = (b !== null && b !== undefined && a !== null && a !== undefined) ? Math.round(a - b) : null;
+    const deltaHtml = delta === null ? "" : (delta >= 0
+      ? `<span class="metric-delta up">▲ +${delta}</span>`
+      : `<span class="metric-delta down">▼ −${Math.abs(delta)}</span>`);
+    const cell = document.createElement("div");
+    cell.className = "metric";
+    cell.innerHTML = `
+      <div class="metric-head"><strong>${label}</strong>${deltaHtml}</div>
+      <div class="metric-desc">${desc}</div>
+      <div class="metric-bars">
+        <div class="metric-bar"><span>before</span><div class="track"><div class="fill" style="width:${b === null || b === undefined ? 0 : b}%"></div></div><b>${bTxt}</b></div>
+        <div class="metric-bar"><span>after</span><div class="track"><div class="fill fill-after" style="width:${a === null || a === undefined ? 0 : a}%"></div></div><b>${aTxt}</b></div>
+      </div>`;
+    grid.appendChild(cell);
+  }
+  const afterScore = m.after_score;
+  $("metrics-note").textContent = afterScore === undefined || afterScore === null
+    ? ""
+    : `Post-rewrite re-scan: the output scores ${afterScore}/100 on the same local signals (verification of the shown rewrite — not a third-party detector).`;
+  box.hidden = false;
+}
+
+// Plain register meter: the prominent before → after bar in the result
+// panel, plus the second gauge next to the naturalness score. Driven by the
+// same verified human-writing memory as the grid row (fractions 0-1
+// rendered as 0-100).
+function renderPlainMeter(r) {
+  const meter = $("plain-meter");
+  const pr = (r.metrics || {}).plain_register;
+  const gaugeWrap = $("plain-score-wrap");
+  if (!meter || !pr || pr.before === undefined || pr.after === undefined) {
+    if (meter) meter.hidden = true;
+    if (gaugeWrap) gaugeWrap.hidden = true;
+    return;
+  }
+  const before = Math.round((pr.before || 0) * 100);
+  const after = Math.round((pr.after || 0) * 100);
+  $("plain-meter-before").textContent = before;
+  $("plain-meter-after").textContent = after;
+  $("plain-meter-before-fill").style.width = before + "%";
+  $("plain-meter-after-fill").style.width = "0%";
+  const delta = $("plain-meter-delta");
+  const diff = after - before;
+  delta.textContent = diff >= 0 ? `▲ +${diff} plainer` : `▼ −${Math.abs(diff)} stiffer`;
+  delta.className = "metric-delta " + (diff >= 0 ? "up" : "down");
+  meter.hidden = false;
+  // Animate the after bar once the meter is visible.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      $("plain-meter-after-fill").style.width = after + "%";
+    });
+  });
+  // Second gauge: the result's plain register, side by side with naturalness.
+  if (gaugeWrap) {
+    const gaugeBox = gaugeWrap.querySelector(".score-box");
+    gaugeBox.style.setProperty("--plain-score", after);
+    gaugeBox.classList.remove("pulse");
+    void gaugeBox.offsetWidth;
+    gaugeBox.classList.add("pulse");
+    animateScore($("plain-score-num"), after);
+    gaugeWrap.hidden = false;
+  }
+}
+
+function renderWarnings(warnings) {
+  const box = $("warnings");
+  box.innerHTML = "";
+  box.hidden = !(warnings && warnings.length);
+  (warnings || []).forEach((w) => {
+    const p = document.createElement("p");
+    p.textContent = w;
+    box.appendChild(p);
+  });
+}
+
+function renderResult(r, opts) {
+  lastResult = r;
+  const instant = opts && opts.instant;
+  $("result-empty").hidden = true;
+  $("detector-result").hidden = true;
+  $("analysis").hidden = false;
+  $("export-bar").hidden = false;
+  // Re-trigger the reveal animation.
+  const analysis = $("analysis");
+  analysis.classList.remove("result-reveal");
+  void analysis.offsetWidth;
+  analysis.classList.add("result-reveal");
+  renderWarnings(r.warnings);
+  renderMetrics(r);
+  renderPlainMeter(r);
+  animateScore($("score-num"), r.score);
+  const box = document.querySelector(".score-box");
+  box.style.setProperty("--score", r.score);
+  box.classList.remove("pulse");
+  void box.offsetWidth;
+  box.classList.add("pulse");
+  const issues = $("issues");
+  issues.innerHTML = "";
+  if (!r.issues.length) {
+    const li = document.createElement("li");
+    li.className = "ok";
+    li.textContent = "No obvious AI tells detected.";
+    issues.appendChild(li);
+  } else {
+    r.issues.forEach((i) => {
+      const li = document.createElement("li");
+      li.className = "sev-" + i.severity;
+      const msg = esc(i.message);
+      const sug = esc(i.suggestion);
+      li.innerHTML = `<span class="tag">${esc(i.kind)}</span> ${msg} — <em>${sug}</em>`;
+      issues.appendChild(li);
+    });
+  }
+  $("before").innerHTML = renderDiffPane(r.diff, "before");
+  // Type the rewrite out, then swap in the word-level diff — unless the
+  // text was already streamed live into the pane (instant mode).
+  const shownText = r.llm_used ? (r.llm_rewritten || r.rewritten) : r.rewritten;
+  if (instant) {
+    $("after").classList.remove("typing-caret");
+    $("after").innerHTML = renderDiffPane(r.diff, "after");
+  } else {
+    typeInto($("after"), renderDiffPane(r.diff, "after"), shownText);
+  }
+  const planNote = $("plan-note");
+  if (r.plan_note) {
+    planNote.textContent = "⚠ " + r.plan_note;
+    planNote.hidden = false;
+  } else {
+    planNote.hidden = true;
+  }
+  $("llm-note").textContent = r.llm_used
+    ? (r.llm_method === "chain"
+        ? `translation chain · ${r.llm_provider || "auto"} · EN→中文→日本語→suomi→EN`
+        : `higher quality (${r.llm_provider || "LLM"})`)
+    : "";
+  const llmWarn = $("llm-warn");
+  if (r.llm_warning) {
+    llmWarn.textContent = "⚠ " + r.llm_warning;
+    llmWarn.hidden = false;
+  } else {
+    llmWarn.hidden = true;
+  }
+  const scoreLabel = document.querySelector("#result-card .card-head h2");
+  if (scoreLabel) scoreLabel.textContent = "Result";
+  refreshHistory();
+}
+
+async function runOne() {
+  const payload = {
+    text: $("input").value,
+    style: $("style").value,
+    use_llm: $("use-llm").checked,
+    deep: $("deep").checked,
+    provider: $("provider").value,
+    intensity: currentIntensity(),
+    seed: seedCounter,
+  };
+  if ($("stream").checked) {
+    await runOneStream(payload);
+    return;
+  }
+  const btn = $("run-humanize");
+  btn.disabled = true;
+  btn.textContent = "Working…";
+  startSteps();
+  try {
+    const res = await fetch("/api/naturalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) { finishSteps(); showError(data.error || "Request failed"); return; }
+    renderResult(data);
+  } catch (e) {
+    finishSteps();
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Request failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Naturalize";
+  }
+}
+
+// Streaming variant: read the SSE stream and reveal the rewrite live.
+async function runOneStream(payload) {
+  const btn = $("run-humanize");
+  btn.disabled = true;
+  btn.textContent = "Streaming…";
+  startSteps();
+  const after = $("after");
+  after.textContent = "";
+  after.classList.add("typing-caret");
+  $("result-empty").hidden = true;
+  $("analysis").hidden = false;
+  $("detector-result").hidden = true;
+  $("export-bar").hidden = false;
+  $("before").textContent = payload.text;
+  $("llm-note").textContent = "";
+  $("llm-warn").hidden = true;
+  $("plan-note").hidden = true;
+  let failed = null;
+  let receivedDone = false;
+  let watchdog = null;
+  const detail = $("stream-detail");
+  try {
+    const res = await fetch("/api/naturalize/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let errText = "Stream request failed";
+      try { errText = (await res.json()).error || errText; } catch (e) { /* non-JSON */ }
+      throw new Error(errText);
+    }
+    if (!res.body) throw new Error("Streaming not supported by this browser");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    // Stall watchdog: the server pings every ~8s while working, so if no
+    // event has arrived for 25s the connection is dead — cancel it instead
+    // of leaving the button stuck on "Streaming…" forever.
+    let lastEventAt = Date.now();
+    watchdog = setInterval(() => {
+      if (Date.now() - lastEventAt > 25000) {
+        if (!failed) failed = "Connection stalled — no data from the server for 25s. Try again, or uncheck \"Stream live\".";
+        reader.cancel().catch(() => {});
+      }
+    }, 4000);
+    // SSE event handlers keyed by name.
+    const onEvent = (event, data) => {
+      lastEventAt = Date.now();
+      if (event === "ping") {
+        // keep-alive; nothing to render
+      } else if (event === "status") {
+        const idx = { analyzing: 0, rewriting: 1, verifying: 2 }[data.step];
+        if (idx !== undefined) setStep(idx);
+        if (data.detail) {
+          detail.textContent = data.detail;
+          detail.hidden = false;
+        }
+      } else if (event === "delta") {
+        after.textContent += data.text || "";
+      } else if (event === "clear") {
+        // The deterministic preview is done; the LLM rewrite is about to
+        // stream in — reset the pane so the two never concatenate.
+        after.textContent = "";
+      } else if (event === "done") {
+        receivedDone = true;
+        // The server sends the result payload as the done event's data
+        // (no wrapper), so `data` *is* the result.
+        renderResult(data, { instant: true });
+      } else if (event === "error") {
+        failed = data.message || "Stream failed";
+      }
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Events are separated by a blank line; a data line may be split
+      // across chunks, so only consume complete blocks.
+      let sep;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        let event = "message";
+        const dataLines = [];
+        block.split("\n").forEach((line) => {
+          if (line.startsWith("event: ")) event = line.slice(7).trim();
+          else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+        });
+        if (!dataLines.length) continue;
+        let parsed;
+        try { parsed = JSON.parse(dataLines.join("\n")); } catch (e) { continue; }
+        onEvent(event, parsed);
+      }
+    }
+    // Trailing block without the blank-line terminator.
+    if (buffer.trim()) {
+      let event = "message";
+      const dataLines = [];
+      buffer.split("\n").forEach((line) => {
+        if (line.startsWith("event: ")) event = line.slice(7).trim();
+        else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+      });
+      if (dataLines.length) {
+        try { onEvent(event, JSON.parse(dataLines.join("\n"))); } catch (e) { /* ignore */ }
+      }
+    }
+    after.classList.remove("typing-caret");
+    detail.hidden = true;
+    if (receivedDone) { finishSteps(); }
+    else {
+      finishSteps();
+      showError(failed || "Stream ended before a result arrived — try again, or uncheck \"Stream live\".");
+    }
+  } catch (e) {
+    after.classList.remove("typing-caret");
+    detail.hidden = true;
+    finishSteps();
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Stream failed: " + e.message);
+  } finally {
+    if (watchdog) clearInterval(watchdog);
+    btn.disabled = false;
+    btn.textContent = "Naturalize";
+  }
+}
+
+async function runBatch() {
+  const raw = $("batch-input").value;
+  const texts = raw.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  if (!texts.length) { alert("Batch input is empty."); return; }
+  const payload = {
+    texts,
+    style: $("style").value,
+    use_llm: $("use-llm").checked,
+    deep: $("deep").checked,
+    provider: $("provider").value,
+    intensity: currentIntensity(),
+    seed: seedCounter,
+  };
+  $("run-batch").disabled = true;
+  $("run-batch").textContent = "Working…";
+  try {
+    const res = await fetch("/api/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Request failed"); return; }
+    const out = $("batch-out");
+    out.innerHTML = "";
+    data.results.forEach((r, i) => {
+      const card = document.createElement("details");
+      card.className = "batch-card";
+      card.innerHTML = `
+        <summary>Doc ${i + 1} — naturalness ${r.score}/100 (${r.issues.length} issue${r.issues.length === 1 ? "" : "s"})${r.llm_used ? " · " + (r.llm_provider || "llm") : ""}</summary>
+        <div class="compare-grid">
+          <div class="compare-col"><h4>Before</h4><pre>${renderDiffPane(r.diff, "before")}</pre></div>
+          <div class="compare-col"><h4>After</h4><pre>${renderDiffPane(r.diff, "after")}</pre></div>
+        </div>`;
+      out.appendChild(card);
+    });
+    refreshHistory();
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Request failed: " + e.message);
+  } finally {
+    $("run-batch").disabled = false;
+    $("run-batch").textContent = "Naturalize batch";
+  }
+}
+
+// ---------------------------------------------------------------- upload / export
+function wireUpload() {
+  const zone = $("upload");
+  const fileInput = $("file");
+
+  $("pick").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("drag"); })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove("drag"); })
+  );
+  zone.addEventListener("drop", (e) => {
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  ["dragover", "drop"].forEach((ev) =>
+    window.addEventListener(ev, (e) => e.preventDefault())
+  );
+  $("edit-toggle").addEventListener("click", () => {
+    $("editor-wrap").classList.remove("show-highlight");
+    $("edit-toggle").hidden = true;
+  });
+}
+
+async function handleFile(file) {
+  const okName = /\.(txt|md|markdown|docx|pdf)$/i.test(file.name);
+  if (!okName) {
+    alert("Unsupported file type — upload a .txt, .md, .docx, or .pdf.");
+    return;
+  }
+  if (file.size > maxUploadBytes) {
+    alert(`File is too large (max ${Math.round(maxUploadBytes / 1048576)} MB).`);
+    return;
+  }
+  const hint = $("hint");
+  hint.textContent = `Extracting text from ${file.name}…`;
+  try {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("style", $("style").value);
+    form.append("provider", $("provider").value);
+    form.append("intensity", String(currentIntensity()));
+    form.append("seed", String(seedCounter));
+    if (!$("use-llm").checked) form.append("use_llm", "false");
+    if ($("deep").checked) form.append("deep", "true");
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Upload failed"); hint.textContent = ""; return; }
+    $("input").value = data.original;
+    $("editor-wrap").classList.remove("show-highlight");
+    $("edit-toggle").hidden = true;
+    if (mode === "detector") {
+      runDetect();
+    } else {
+      renderResult(data);
+    }
+    hint.textContent = `Extracted ${data.original.split(/\s+/).filter(Boolean).length} words from ${file.name}. Edit, then re-run if you like.`;
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Upload failed: " + e.message);
+    hint.textContent = "";
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function download(fmt) {
+  const text = lastResult
+    ? (lastResult.llm_used ? (lastResult.llm_rewritten || lastResult.rewritten) : lastResult.rewritten)
+    : $("input").value;
+  if (!text) return;
+  const filename = `naturalized.${fmt}`;
+  if (fmt === "txt") {
+    downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), filename);
+    return;
+  }
+  try {
+    const res = await fetch("/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, format: fmt }),
+    });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); showError(data.error || "Export failed"); return; }
+    downloadBlob(await res.blob(), filename);
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Export failed: " + e.message);
+  }
+}
+
+document.querySelectorAll(".export-bar button[data-fmt]").forEach((btn) =>
+  btn.addEventListener("click", () => download(btn.dataset.fmt))
+);
+
+// ---------------------------------------------------------------- plagiarism
+function escVerdict(v) {
+  if (v === "high") return "High similarity — review before submitting";
+  if (v === "medium") return "Medium similarity — check the flagged passages";
+  return "Low similarity";
+}
+
+async function runPlag() {
+  const text = $("plag-text").value.trim();
+  const refs = $("plag-refs").value.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  if (!text) { alert("Paste some text to check first."); return; }
+  if (!refs.length) { alert("Add at least one reference source to compare against."); return; }
+  const btn = $("run-plag");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+  try {
+    const res = await fetch("/api/plagiarism", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, refs }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Plagiarism check failed"); return; }
+    const out = $("plag-out");
+    const vCls = data.verdict === "high" ? "sev-high" : (data.verdict === "medium" ? "sev-medium" : "sev-low");
+    let html = `<p class="plag-score ${vCls}"><strong>${escVerdict(data.verdict)}</strong> — similarity ${data.score}/100 · ${data.word_count} words checked</p>`;
+    if (data.per_ref && data.per_ref.length) {
+      html += `<p class="hint">Per source: ${data.per_ref.map((r) => `#${r.index + 1} ${r.score}%`).join(" · ")}</p>`;
+    }
+    if (data.matching && data.matching.length) {
+      html += `<ul class="issues">`;
+      data.matching.forEach((m) => {
+        const refsList = m.refs.map((i) => `source #${i + 1}`).join(", ");
+        html += `<li class="sev-medium"><span class="tag">match</span> “${esc(m.snippet)}” — overlaps ${esc(refsList)}</li>`;
+      });
+      html += `</ul>`;
+    }
+    html += `<p class="hint">${esc(data.note)}</p>`;
+    out.innerHTML = html;
+    out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Plagiarism check failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check similarity";
+  }
+}
+
+$("run").addEventListener("click", () => { if (mode === "detector") runDetect(); else runOne(); });
+$("run-humanize").addEventListener("click", runOne);
+$("run-batch").addEventListener("click", runBatch);
+$("run-plag").addEventListener("click", runPlag);
+init();
+</script>
+</body>
+</html>

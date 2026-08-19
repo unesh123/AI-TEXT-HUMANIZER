@@ -1,0 +1,23 @@
+# Runtime state (free-plan daily word counter)
+state/
+
+# Secrets — never commit API keys (Claude / CX / Gemini / GPTZero)
+.env
+.env.local
+.env.*
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Generated UI-check artifacts
+ui-check*/
+ui-export-check/
+ui-check-sse.json/
+*.sse.json
+
+# Smoke test artifacts
+.smoke/
+
+# Logs
+*.log
