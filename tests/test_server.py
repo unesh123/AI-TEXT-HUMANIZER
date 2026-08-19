@@ -174,6 +174,13 @@ class ServerTest(unittest.TestCase):
             data = json.loads(resp.read().decode("utf-8"))
         self.assertEqual(data["count"], 0)
 
+    def test_detect_short_text_is_uncertain(self):
+        status, body = self._post("/api/detect", {"text": "Short draft."})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["verdict"], "uncertain")
+        self.assertLessEqual(body["confidence"], 45)
+        self.assertIn("evidence_coverage", body)
+
     def test_naturalize_stream_endpoint(self):
         # The SSE endpoint returns text/event-stream with status/delta/done
         # events; deltas reassemble the deterministic rewrite (no LLM in the
@@ -467,6 +474,14 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("error", body)
 
+    def test_naturalize_reports_selected_rewrite_mode(self):
+        status, body = self._post(
+            "/api/naturalize",
+            {"text": "The team reviewed 12 accounts and found two issues.", "rewrite_mode": "full"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["metrics"]["rewrite_mode"], "full")
+
     def test_naturalize_returns_metrics(self):
         status, body = self._post(
             "/api/naturalize",
@@ -482,7 +497,7 @@ class ServerTest(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode"},
         )
         self.assertIn("before", m["plain_register"])
         self.assertIn("after", m["plain_register"])

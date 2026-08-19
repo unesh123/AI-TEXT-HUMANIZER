@@ -115,6 +115,7 @@ class Naturalizer:
         intensity: float = 0.5,
         instruction: Optional[str] = None,
         best_of: int = 1,
+        rewrite_mode: str = "full",
     ) -> NaturalizeResult:
         """Score *text* and produce rewritten versions.
 
@@ -133,7 +134,20 @@ class Naturalizer:
         single-shot path stays cheap and deterministic.
         """
         text = (text or "").strip()
+        rewrite_mode = str(rewrite_mode or "full").strip().lower()
+        if rewrite_mode not in {"light", "standard", "full"}:
+            rewrite_mode = "full"
         intensity = max(0.0, min(1.0, intensity))
+        mode_directives = {
+            "light": "Make conservative clarity edits only. Preserve paragraph and sentence structure wherever possible.",
+            "standard": "Rewrite each paragraph substantially while preserving its original order and factual content.",
+            "full": "Re-author the entire document. Rebuild sentence structures and paragraph flow from the source meaning, not its wording.",
+        }
+        # Rewrite approach controls structure and prompting; intensity stays
+        # within the value already capped by the active plan at the API layer.
+        if rewrite_mode == "light":
+            intensity = min(intensity, 0.45)
+        instruction = "\n\n".join(part for part in (mode_directives[rewrite_mode], instruction) if part)
         if not text:
             return NaturalizeResult(
                 original="", rewritten="", score=100, style=style, intensity=intensity
@@ -272,6 +286,7 @@ class Naturalizer:
             "before": report.metrics,
             "after": after_report.metrics,
             "after_score": after_report.score,
+            "rewrite_mode": rewrite_mode,
             "source_overlap": _ngram_overlap(text, chosen or text),
             "detector_comparison": {
                 "before": {
@@ -365,10 +380,20 @@ class Naturalizer:
         confidence = max(30, min(99, confidence))
 
         abstain = abstain_reasons(text, report)
+        strong_ai_evidence = verdict == "ai" and (
+            report.score <= 25 or dist["ai"] >= 75
+        )
+        if abstain and not strong_ai_evidence:
+            # A short or structurally unsuitable sample cannot support an
+            # authorship-style conclusion. Keep the raw score available but
+            # surface an explicit uncertain verdict and cap confidence.
+            verdict = "uncertain"
+            confidence = min(confidence, 45)
         return {
             "score": report.score,
             "verdict": verdict,
             "confidence": confidence,
+            "evidence_coverage": round(coverage, 3),
             "distribution": {"ai": dist["ai"], "mix": dist["mix"], "human": dist["human"]},
             "sentences": dist["sentences"],
             "regions": dist["regions"],
@@ -387,6 +412,7 @@ class Naturalizer:
         provider: str = "auto",
         intensity: float = 0.5,
         seed: Optional[int] = None,
+        rewrite_mode: str = "full",
     ) -> List[NaturalizeResult]:
         """Naturalize many texts, returning one result per input."""
         base = self.seed if seed is None else seed
@@ -399,6 +425,7 @@ class Naturalizer:
                 provider=provider,
                 seed=base + i,
                 intensity=intensity,
+                rewrite_mode=rewrite_mode,
             )
             for i, t in enumerate(texts)
         ]

@@ -29,7 +29,8 @@ import time
 from typing import Dict, Iterator, List, Optional
 
 from .detectors import analyze
-from .engine import NaturalizeResult
+from .engine import NaturalizeResult, Naturalizer, _ngram_overlap
+from .critics import preservation_issues
 from .styles import DEFAULT_STYLE, get_style
 from .transforms import rewrite as deterministic_rewrite
 
@@ -66,13 +67,26 @@ def naturalize_stream(
     provider: str = "auto",
     intensity: float = 0.5,
     prefer_llm: bool = True,
+    rewrite_mode: str = "full",
 ) -> Iterator[Dict]:
     """Stream one naturalize run as ``(status | delta | done | error)`` events."""
     text = (text or "").strip()
     if not text:
         yield {"type": "error", "message": "missing or empty text"}
         return
+    rewrite_mode = str(rewrite_mode or "full").strip().lower()
+    if rewrite_mode not in {"light", "standard", "full"}:
+        rewrite_mode = "full"
     intensity = max(0.0, min(1.0, intensity))
+    # Rewrite mode selects the structural directive; the API has already
+    # capped intensity according to the active plan.
+    if rewrite_mode == "light":
+        intensity = min(intensity, 0.45)
+    mode_instruction = {
+        "light": "Make conservative clarity edits only. Preserve paragraph and sentence structure wherever possible.",
+        "standard": "Rewrite each paragraph substantially while preserving its original order and factual content.",
+        "full": "Re-author the entire document. Rebuild sentence structures and paragraph flow from the source meaning, not its wording.",
+    }[rewrite_mode]
 
     profile = get_style(style)
     style = profile["name"]
@@ -175,6 +189,7 @@ def naturalize_stream(
                     style=style,
                     provider=provider,
                     voice=rng.randrange(1, 5),
+                    instruction=mode_instruction,
                     provider_out=used,
                 )
                 if gen is not None:
@@ -229,7 +244,20 @@ def naturalize_stream(
         for event in _emit_words(rewritten):
             yield event
 
+    # Apply the same hard fact-preservation gate as non-streaming rewrites.
+    deterministic_issues = preservation_issues(text, rewritten or text)
+    if any(issue.get("severity") == "high" for issue in deterministic_issues):
+        rewritten = text
+        deterministic_issues = preservation_issues(text, rewritten)
+    llm_issues = []
+    if llm_used and llm_rewritten:
+        llm_issues = preservation_issues(text, llm_rewritten)
+        if any(issue.get("severity") == "high" for issue in llm_issues):
+            llm_rewritten = rewritten
+            llm_warning = ((llm_warning + " ") if llm_warning else "") + "LLM output was replaced by a fact-preserving rewrite because it changed a number."
+            llm_issues = preservation_issues(text, llm_rewritten)
     chosen = llm_rewritten if llm_used else rewritten
+    semantic_issues = preservation_issues(text, chosen or text)
     yield {"type": "status", "step": "verifying"}
     after_report = analyze(
         chosen or text,
@@ -238,10 +266,25 @@ def naturalize_stream(
     )
     from .human_memory import plain_register_score
 
+    verifier = Naturalizer(seed=seed, prefer_llm=False)
+    before_detection = verifier.detect(text, style=style)
+    after_detection = verifier.detect(chosen or text, style=style)
     metrics = {
         "before": report.metrics,
         "after": after_report.metrics,
         "after_score": after_report.score,
+        "rewrite_mode": rewrite_mode,
+        "source_overlap": _ngram_overlap(text, chosen or text),
+        "detector_comparison": {
+            "before": {"score": before_detection["score"], "verdict": before_detection["verdict"]},
+            "after": {"score": after_detection["score"], "verdict": after_detection["verdict"], "confidence": after_detection["confidence"], "distribution": after_detection["distribution"]},
+        },
+        "semantic_preservation": {
+            "issues": semantic_issues,
+            "hard_drift": any(i.get("severity") == "high" for i in semantic_issues),
+            "deterministic_issues": deterministic_issues,
+            "llm_issues": llm_issues,
+        },
         # Verified human-writing memory: how plain the register is (fraction
         # of words from the everyday vocabulary humans actually use). Kept
         # in lockstep with the engine so the streamed result renders the

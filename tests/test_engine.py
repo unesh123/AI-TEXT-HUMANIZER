@@ -151,7 +151,9 @@ class EngineTest(unittest.TestCase):
     def test_detect_empty_text(self):
         d = self.engine.detect("")
         self.assertEqual(d["word_count"], 0)
-        self.assertIn(d["verdict"], ("human", "ai", "mixed"))
+        self.assertEqual(d["verdict"], "uncertain")
+        self.assertLessEqual(d["confidence"], 45)
+        self.assertIn("evidence_coverage", d)
 
     # -- verification re-scan (metrics before/after) ---------------------
 
@@ -168,7 +170,7 @@ class EngineTest(unittest.TestCase):
         m = result.metrics
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode"},
         )
         self.assertEqual(
             set(m["before"]),
@@ -183,6 +185,16 @@ class EngineTest(unittest.TestCase):
         # Verification score is a real 0-100 number.
         self.assertIsInstance(m["after_score"], int)
         self.assertTrue(0 <= m["after_score"] <= 100)
+
+    def test_full_rewrite_mode_is_reported_without_overriding_intensity(self):
+        result = self.engine.naturalize(
+            "The team reviewed 12 accounts and found two issues.",
+            use_llm=False,
+            intensity=0.2,
+            rewrite_mode="full",
+        )
+        self.assertEqual(result.metrics["rewrite_mode"], "full")
+        self.assertEqual(result.intensity, 0.2)
 
     def test_source_overlap_is_reported(self):
         result = self.engine.naturalize(

@@ -844,3 +844,10 @@ curl http://127.0.0.1:8000/api/health
 ```
 
 For public deployment, place the server behind a TLS-terminating reverse proxy, set `HOST=0.0.0.0`, configure `ALLOWED_ORIGINS` explicitly, mount `/app/state` as persistent storage, and provide provider credentials through the platform’s secret manager rather than a committed file. The included server is suitable as a compact application service; production deployments should still add platform-level TLS, backups, monitoring, and log retention.
+
+
+## Rewrite approaches and evidence-aware detection
+
+The humanizer now offers three document approaches: **Light edit** for conservative clarity work, **Standard rewrite** for substantial paragraph-level rewriting, and **Full re-author** for a whole-document rewrite that rebuilds sentence structure and paragraph flow while preserving factual claims. Full re-author is the default approach when the LLM path is enabled. The result includes a source-overlap measurement based on shared five-word sequences, a semantic-preservation report, and a before/after local-detector comparison.
+
+Long-running humanization requests can be cancelled from the interface. Cancellation stops the browser request and leaves the source text unchanged. The detector now exposes its evidence coverage and returns an explicit `uncertain` verdict for low-evidence samples, except when a short sample still contains unanimous, strong local AI signals. This distinguishes a limited sample from a confident human or AI classification.

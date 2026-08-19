@@ -712,3 +712,11 @@ button:active:not(:disabled), .mode-tab:active { transform: translateY(0) scale(
   }
   .card:hover, .bench:hover, .history-item:hover, button:hover:not(:disabled), .mode-tab:hover { transform: none; }
 }
+
+
+/* Low-evidence detector state: intentionally distinct from both AI and human verdicts. */
+.v-uncertain {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}

@@ -214,6 +214,12 @@ def _normalize_intensity(value, cap: float = 1.0) -> float:
     return max(0.0, min(cap, intensity))
 
 
+def _normalize_rewrite_mode(value) -> str:
+    """Validate the document rewrite approach requested by the UI."""
+    mode = str(value or "full").strip().lower()
+    return mode if mode in {"light", "standard", "full"} else "full"
+
+
 def _normalize_seed(value) -> int:
     """Non-negative seed for deterministic rewrite variety (default 0)."""
     try:
@@ -677,6 +683,7 @@ class Handler(BaseHTTPRequestHandler):
                 data.get("intensity"), cap=features.get("max_intensity", 1.0)
             )
             seed = _normalize_seed(data.get("seed"))
+            rewrite_mode = _normalize_rewrite_mode(data.get("rewrite_mode"))
             result = engine.naturalize(
                 text,
                 style=style,
@@ -685,6 +692,7 @@ class Handler(BaseHTTPRequestHandler):
                 provider=provider,
                 seed=seed,
                 intensity=intensity,
+                rewrite_mode=rewrite_mode,
             )
             record_usage(len(text.split()))
             _save_history(result, text, style, "naturalize", provider, intensity, seed=seed)
@@ -714,10 +722,11 @@ class Handler(BaseHTTPRequestHandler):
             provider = _normalize_provider(data.get("provider"))
             intensity = _normalize_intensity(data.get("intensity"))
             seed = _normalize_seed(data.get("seed"))
+            rewrite_mode = _normalize_rewrite_mode(data.get("rewrite_mode"))
             results = engine.batch(
                 [t for t in texts if isinstance(t, str)],
                 style=style, use_llm=use_llm, deep=deep, provider=provider,
-                intensity=intensity, seed=seed,
+                intensity=intensity, seed=seed, rewrite_mode=rewrite_mode,
             )
             for i, r in enumerate(results):
                 _save_history(
@@ -768,6 +777,7 @@ class Handler(BaseHTTPRequestHandler):
             data.get("intensity"), cap=features.get("max_intensity", 1.0)
         )
         seed = _normalize_seed(data.get("seed"))
+        rewrite_mode = _normalize_rewrite_mode(data.get("rewrite_mode"))
 
         headers = self._common_headers()
         headers["Content-Type"] = "text/event-stream; charset=utf-8"
@@ -802,6 +812,7 @@ class Handler(BaseHTTPRequestHandler):
                     provider=provider,
                     intensity=intensity,
                     seed=seed,
+                    rewrite_mode=rewrite_mode,
                 ):
                     ev_q.put(("event", event))
             except Exception as exc:  # pragma: no cover - defensive

@@ -267,6 +267,14 @@
       <label for="provider">Model
         <select id="provider"></select>
       </label>
+      <label for="rewrite-mode">Approach
+        <select id="rewrite-mode">
+          <option value="full" selected>Full re-author</option>
+          <option value="standard">Standard rewrite</option>
+          <option value="light">Light edit</option>
+        </select>
+        <small>Full re-author rebuilds sentences while preserving facts.</small>
+      </label>
       <label>Intensity
         <span class="intensity-row">
           <input type="range" id="intensity" min="0" max="100" step="5" value="60">
@@ -286,6 +294,7 @@
         Deep humanize <small>(translation chain)</small>
       </label>
       <button type="button" class="ghost small" id="vary-btn" title="Run again with a different seed — different word choices and rhythm">↻ Vary</button>
+      <button type="button" class="ghost small" id="cancel-humanize" hidden>Cancel</button>
       <button type="button" class="primary" id="run-humanize">Naturalize</button>
     </section>
 
@@ -358,6 +367,7 @@ let plan = { name: "free", features: {} };
 let intensityPct = 60;       // 0-100 slider value
 let planIntensityCap = 100;  // % cap from the active plan (Free caps at 50%)
 let seedCounter = 0;         // bumped by "Vary" / "Humanize again" / sentence re-humanize
+let activeHumanizeController = null;
 
 const SERVER_DOWN_MSG =
   "Can't reach the server — it's stopped or unreachable. Restart it with start.bat (or python server.py), then refresh this page.";
@@ -513,6 +523,7 @@ function wireTabs() {
     intensityPct = +$("intensity").value;
     syncIntensityLabel();
   });
+  $("cancel-humanize").addEventListener("click", cancelHumanizeRequest);
   // Sentence-level re-humanize: "↻ humanize" on a flagged sentence.
   $("det-sentences").addEventListener("click", onSentenceAction);
 }
@@ -526,6 +537,17 @@ function syncIntensityLabel() {
 
 function currentIntensity() {
   return Math.min(planIntensityCap, intensityPct) / 100;
+}
+function beginHumanizeRequest(controller) {
+  activeHumanizeController = controller;
+  $("cancel-humanize").hidden = false;
+}
+function endHumanizeRequest(controller) {
+  if (activeHumanizeController === controller) activeHumanizeController = null;
+  $("cancel-humanize").hidden = true;
+}
+function cancelHumanizeRequest() {
+  if (activeHumanizeController) activeHumanizeController.abort();
 }
 
 function openPlanModal() {
@@ -1119,8 +1141,10 @@ function renderDetector(d) {
   const banner = $("verdict-banner");
   banner.hidden = false;
   const verdict = d.verdict;
-  banner.className = "verdict-banner " + (verdict === "human" ? "v-human" : (verdict === "mixed" ? "v-mixed" : "v-ai"));
-  if (verdict === "human") {
+  banner.className = "verdict-banner " + (verdict === "human" ? "v-human" : (verdict === "mixed" ? "v-mixed" : (verdict === "uncertain" ? "v-uncertain" : "v-ai")));
+  if (verdict === "uncertain") {
+    banner.innerHTML = `This sample is <strong>too limited for a reliable AI-authorship call</strong>. Add more prose before relying on a detector result (${d.confidence}% confidence).`;
+  } else if (verdict === "human") {
     banner.innerHTML = `Our detector is <strong>highly confident</strong> that the text is <strong>written entirely by a human</strong> (${d.confidence}% confidence).`;
   } else if (verdict === "mixed") {
     banner.innerHTML = `The text looks <strong>mixed</strong> — some passages read AI-generated, others human (${d.confidence}% confidence).`;
@@ -1142,8 +1166,9 @@ function renderDetector(d) {
     caveatEl.hidden = false;
     caveatEl.innerHTML = caveats.join(" ");
   }
+  const evidence = d.evidence_coverage === undefined ? "" : ` · evidence ${Math.round(d.evidence_coverage * 100)}%`;
   $("detector-note").textContent = d.word_count
-    ? `${d.word_count} words · naturalness ${d.score}/100 on the same local signals (a heuristic, not a third-party detector).`
+    ? `${d.word_count} words · naturalness ${d.score}/100${evidence} on local signals (a heuristic, not a third-party detector).`
     : "";
 
   // Sentence highlights in the content card.
@@ -1385,7 +1410,17 @@ function renderResult(r, opts) {
   analysis.classList.remove("result-reveal");
   void analysis.offsetWidth;
   analysis.classList.add("result-reveal");
-  renderWarnings(r.warnings);
+  const qualityWarnings = [...(r.warnings || [])];
+  const resultMetrics = r.metrics || {};
+  const overlap = resultMetrics.source_overlap || {};
+  const semantic = resultMetrics.semantic_preservation || {};
+  if (resultMetrics.rewrite_mode === "full" && Number(overlap.reuse_percent) > 30) {
+    qualityWarnings.push("Full re-authoring kept more source phrasing than expected. Try Vary or choose a different configured model for a stronger rewrite.");
+  }
+  if (semantic.issues && semantic.issues.length) {
+    qualityWarnings.push("Review the semantic-preservation notes before using this rewrite.");
+  }
+  renderWarnings(qualityWarnings);
   renderMetrics(r);
   renderPlainMeter(r);
   animateScore($("score-num"), r.score);
@@ -1432,6 +1467,7 @@ function renderResult(r, opts) {
     ? (r.llm_method === "chain"
         ? `translation chain · ${r.llm_provider || "auto"} · EN→中文→日本語→suomi→EN`
         : `higher quality (${r.llm_provider || "LLM"})`)
+      + (resultMetrics.rewrite_mode ? ` · ${resultMetrics.rewrite_mode} approach` : "")
     : "";
   const llmWarn = $("llm-warn");
   if (r.llm_warning) {
@@ -1453,6 +1489,7 @@ async function runOne() {
     deep: $("deep").checked,
     provider: $("provider").value,
     intensity: currentIntensity(),
+    rewrite_mode: $("rewrite-mode").value,
     seed: seedCounter,
   };
   if ($("stream").checked) {
@@ -1460,6 +1497,8 @@ async function runOne() {
     return;
   }
   const btn = $("run-humanize");
+  const controller = new AbortController();
+  beginHumanizeRequest(controller);
   btn.disabled = true;
   btn.textContent = "Working…";
   startSteps();
@@ -1468,14 +1507,20 @@ async function runOne() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
     const data = await res.json();
     if (!res.ok) { finishSteps(); showError(data.error || "Request failed"); return; }
     renderResult(data);
   } catch (e) {
     finishSteps();
-    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Request failed: " + e.message);
+    if (e && e.name === "AbortError") {
+      $("hint").textContent = "Humanization cancelled. Your original text is unchanged.";
+    } else {
+      showError(requestFailed(e) ? SERVER_DOWN_MSG : "Request failed: " + e.message);
+    }
   } finally {
+    endHumanizeRequest(controller);
     btn.disabled = false;
     btn.textContent = "Naturalize";
   }
@@ -1484,6 +1529,8 @@ async function runOne() {
 // Streaming variant: read the SSE stream and reveal the rewrite live.
 async function runOneStream(payload) {
   const btn = $("run-humanize");
+  const controller = new AbortController();
+  beginHumanizeRequest(controller);
   btn.disabled = true;
   btn.textContent = "Streaming…";
   startSteps();
@@ -1507,6 +1554,7 @@ async function runOneStream(payload) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
     if (!res.ok) {
       let errText = "Stream request failed";
@@ -1599,9 +1647,14 @@ async function runOneStream(payload) {
     after.classList.remove("typing-caret");
     detail.hidden = true;
     finishSteps();
-    showError(requestFailed(e) ? SERVER_DOWN_MSG : "Stream failed: " + e.message);
+    if (e && e.name === "AbortError") {
+      $("hint").textContent = "Humanization cancelled. Your original text is unchanged.";
+    } else {
+      showError(requestFailed(e) ? SERVER_DOWN_MSG : "Stream failed: " + e.message);
+    }
   } finally {
     if (watchdog) clearInterval(watchdog);
+    endHumanizeRequest(controller);
     btn.disabled = false;
     btn.textContent = "Naturalize";
   }
@@ -1618,6 +1671,7 @@ async function runBatch() {
     deep: $("deep").checked,
     provider: $("provider").value,
     intensity: currentIntensity(),
+    rewrite_mode: $("rewrite-mode").value,
     seed: seedCounter,
   };
   $("run-batch").disabled = true;
