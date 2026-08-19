@@ -205,6 +205,30 @@ class ServerTest(unittest.TestCase):
         )
         self.assertEqual(status, 400)
 
+    def test_naturalize_accepts_titlecase_style(self):
+        """Regression: 'Academic' (title-case) must be normalized, not rejected."""
+        status, body = self._post(
+            "/api/naturalize",
+            {"text": "Furthermore, the results were significant.", "style": "Academic"},
+        )
+        self.assertEqual(status, 200)
+
+    def test_naturalize_accepts_uppercase_style(self):
+        """Regression: 'BUSINESS' (upper-case) must be normalized, not rejected."""
+        status, body = self._post(
+            "/api/naturalize",
+            {"text": "Furthermore, the results were significant.", "style": "BUSINESS"},
+        )
+        self.assertEqual(status, 200)
+
+    def test_detect_accepts_mixed_case_style(self):
+        """Regression: /api/detect must also accept mixed-case style labels."""
+        status, body = self._post(
+            "/api/detect",
+            {"text": "Furthermore, the results were significant.", "style": "Academic"},
+        )
+        self.assertEqual(status, 200)
+
     def test_batch_endpoint(self):
         status, body = self._post(
             "/api/batch", {"texts": ["One sentence.", "Furthermore, data was noisy."]}
