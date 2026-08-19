@@ -168,8 +168,11 @@ def _openai_config() -> Optional[Dict[str, str]]:
         return None
     return {
         "api_key": key,
-        "base": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-        "model": os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        "base": os.environ.get(
+            "OPENAI_API_BASE",
+            os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        ).rstrip("/"),
+        "model": os.environ.get("OPENAI_MODEL", "gpt-5-mini"),
     }
 
 

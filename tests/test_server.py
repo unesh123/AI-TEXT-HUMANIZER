@@ -474,6 +474,16 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("error", body)
 
+    def test_detect_marks_exact_prior_generated_output_as_ai_derived(self):
+        source = "Technology affects everyday life, from work and study to the way people stay in touch with friends."
+        status, rewritten = self._post("/api/naturalize", {"text": source, "use_llm": False})
+        self.assertEqual(status, 200)
+        output = rewritten.get("rewritten") or source
+        status, detected = self._post("/api/detect", {"text": output})
+        self.assertEqual(status, 200)
+        self.assertEqual(detected["verdict"], "ai_derived")
+        self.assertTrue(detected["provenance"]["matched"])
+
     def test_naturalize_reports_selected_rewrite_mode(self):
         status, body = self._post(
             "/api/naturalize",
@@ -497,7 +507,7 @@ class ServerTest(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode", "rewrite_quality"},
         )
         self.assertIn("before", m["plain_register"])
         self.assertIn("after", m["plain_register"])

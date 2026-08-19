@@ -9,8 +9,10 @@ file cannot grow without bound. Pure stdlib.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -46,6 +48,16 @@ def _write(entries: List[Dict]) -> None:
         path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
     except OSError:  # pragma: no cover - read-only FS; degrade gracefully
         pass
+
+
+def _text_key(text: str) -> str:
+    """Stable fingerprint for exact generated-output lineage lookups.
+
+    Normalizing whitespace and case makes copied output match even when a
+    user pastes it into the detector with superficial formatting changes.
+    """
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def _next_id() -> str:
@@ -87,6 +99,7 @@ def save(
         "plan": plan,
         "input": text[:MAX_TEXT_CHARS],
         "output": output[:MAX_TEXT_CHARS],
+        "output_key": _text_key(output),
         "score": round(float(score), 1),
     }
     if extra:
@@ -95,6 +108,19 @@ def save(
     entries.insert(0, entry)
     _write(entries[:MAX_ENTRIES])
     return entry["id"]
+
+
+def find_generated_output(text: str) -> Optional[Dict]:
+    """Return a matching app-generated rewrite, if this exact output exists.
+
+    This is provenance, not a linguistic inference: it only identifies text
+    the current application previously generated and saved in its own history.
+    """
+    key = _text_key(text)
+    for entry in _read():
+        if entry.get("output_key") == key:
+            return entry
+    return None
 
 
 def list_entries(limit: int = 50) -> List[Dict]:

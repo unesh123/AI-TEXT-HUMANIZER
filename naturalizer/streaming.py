@@ -29,18 +29,19 @@ import time
 from typing import Dict, Iterator, List, Optional
 
 from .detectors import analyze
-from .engine import NaturalizeResult, Naturalizer, _ngram_overlap
+from .engine import NaturalizeResult, Naturalizer, _ngram_overlap, _requires_full_rewrite_retry
 from .critics import preservation_issues
 from .styles import DEFAULT_STYLE, get_style
 from .transforms import rewrite as deterministic_rewrite
 
 try:
-    from .llm import llm_available, llm_provider_label, stream_rewrite_with_llm
+    from .llm import llm_available, llm_provider_label, stream_rewrite_with_llm, rewrite_with_llm_details
     from .chain import run_chain
 except ImportError:  # pragma: no cover - defensive
     llm_available = lambda provider="auto": False
     llm_provider_label = lambda provider="auto": None
     stream_rewrite_with_llm = None
+    rewrite_with_llm_details = None
     run_chain = lambda text, style="academic", provider="auto", **kw: None
 
 #: Delay between word-deltas when the rewrite is instant (deterministic /
@@ -203,6 +204,21 @@ def naturalize_stream(
                         llm_used = True
                         llm_method = "single"
                         llm_provider_name = used[0] if used else provider
+                        if rewrite_mode == "full" and _requires_full_rewrite_retry(text, candidate):
+                            yield {"type": "status", "step": "rewriting", "detail": "first pass reused too much source phrasing — rebuilding the rewrite"}
+                            yield {"type": "clear"}
+                            retry_instruction = (mode_instruction + "\n\nThe previous rewrite was too close to the source. Replace the passage completely and do not repeat any five-word source sequence except required names, numbers, quotations, or technical terms.")
+                            retry = rewrite_with_llm_details(
+                                text, style=style, provider=provider,
+                                instruction=retry_instruction, voice=rng.randrange(1, 5),
+                            ) if rewrite_with_llm_details is not None else None
+                            if retry:
+                                llm_rewritten, llm_provider_name = retry
+                                llm_method = "single_retry"
+                                for event in _emit_words(llm_rewritten):
+                                    yield event
+                            if _requires_full_rewrite_retry(text, llm_rewritten):
+                                llm_warning = "The configured model still returned a near-copy after a strict retry. Review source replacement or select another configured model."
             except Exception:  # pragma: no cover - mid-stream failure
                 if not llm_used:
                     if preview_shown:

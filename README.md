@@ -396,7 +396,7 @@ CX_GATEWAY_MODEL=cx/gpt-5.6-sol
 # Direct OpenAI
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o
+OPENAI_MODEL=gpt-5-mini
 
 # Google Gemini (OpenAI-compatible endpoint)
 GEMINI_API_KEY=...

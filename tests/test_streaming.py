@@ -82,7 +82,7 @@ class LlmStreamParseTest(unittest.TestCase):
         request = urlopen.call_args[0][0]
         sent = json.loads(request.data.decode("utf-8"))
         self.assertTrue(sent["stream"])
-        self.assertEqual(sent["model"], "gpt-4o")
+        self.assertEqual(sent["model"], "gpt-5-mini")
 
     def test_anthropic_stream_yields_deltas(self):
         with mock.patch.dict(

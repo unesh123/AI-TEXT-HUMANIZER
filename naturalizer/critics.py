@@ -198,6 +198,17 @@ def preservation_issues(
     return issues
 
 
+def _phrase_reuse_percent(original: str, candidate: str, n: int = 5) -> float:
+    """Share of source n-grams reused by a candidate; lower means a fuller rewrite."""
+    source_words = re.findall(r"[A-Za-z0-9']+", original.lower())
+    candidate_words = re.findall(r"[A-Za-z0-9']+", candidate.lower())
+    if len(source_words) < n:
+        return 0.0
+    source = {tuple(source_words[i:i + n]) for i in range(len(source_words) - n + 1)}
+    output = {tuple(candidate_words[i:i + n]) for i in range(max(0, len(candidate_words) - n + 1))}
+    return (len(source & output) / len(source)) * 100 if source else 0.0
+
+
 def _has_hard_drift(issues: Sequence[Dict[str, str]]) -> bool:
     """True when a candidate fails the hard fact gate (lost numbers)."""
     return any(i["severity"] == "high" for i in issues)
@@ -229,16 +240,17 @@ def rank_candidates(
     if not candidates:
         return None, []
 
-    scored: List[Tuple[bool, int, str, List[Dict[str, str]]]] = []
+    scored: List[Tuple[bool, float, int, str, List[Dict[str, str]]]] = []
     for cand in candidates:
         issues = preservation_issues(original, cand)
         report = analyze(cand, allowlist=allowlist)
         scored.append(
-            (not _has_hard_drift(issues), report.score, cand, issues)
+            (not _has_hard_drift(issues), _phrase_reuse_percent(original, cand), report.score, cand, issues)
         )
 
-    # Sort: fact-faithful first, then by naturalness descending.
-    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    # Sort: factual survival first, then lower phrase reuse, then naturalness.
+    # This stops a near-copy from beating a genuinely re-authored alternative.
+    scored.sort(key=lambda row: (not row[0], row[1], -row[2]))
 
     best = scored[0]
     warnings: List[Dict[str, str]] = []
@@ -252,11 +264,11 @@ def rank_candidates(
                     "dropped); the least-damaging one was kept — verify "
                     "numbers manually"
                 ),
-                "snippet": ", ".join(i["snippet"] for i in best[3]) or "numbers",
+                "snippet": ", ".join(i["snippet"] for i in best[4]) or "numbers",
             }
         )
     else:
-        for _, _, _, issues in scored[1:]:
+        for _, _, _, _, issues in scored[1:]:
             if _has_hard_drift(issues):
                 warnings.append(
                     {
@@ -266,4 +278,4 @@ def rank_candidates(
                         "snippet": ", ".join(i["snippet"] for i in issues),
                     }
                 )
-    return best[2], warnings
+    return best[3], warnings

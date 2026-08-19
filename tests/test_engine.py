@@ -170,7 +170,7 @@ class EngineTest(unittest.TestCase):
         m = result.metrics
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap", "rewrite_mode", "rewrite_quality"},
         )
         self.assertEqual(
             set(m["before"]),

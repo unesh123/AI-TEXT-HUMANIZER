@@ -40,6 +40,16 @@ def _ngram_overlap(original: str, rewritten: str, n: int = 5) -> Dict[str, float
         "reuse_percent": round((shared / len(source)) * 100, 1) if source else 0.0,
     }
 
+
+def _requires_full_rewrite_retry(original: str, candidate: str) -> bool:
+    """True when a purported full rewrite still copies the source too closely."""
+    word_count = len(re.findall(r"[A-Za-z0-9']+", original))
+    if word_count < 35:
+        return False
+    overlap = _ngram_overlap(original, candidate)["reuse_percent"]
+    return overlap > 20.0
+
+
 try:
     from .llm import llm_available, llm_provider_label, rewrite_with_llm, rewrite_with_llm_details
     from .chain import run_chain
@@ -177,8 +187,10 @@ class Naturalizer:
         llm_method: Optional[str] = None
         llm_provider: Optional[str] = None
         candidate: Optional[str] = None
+        llm_warning: Optional[str] = None
         want_llm = self.prefer_llm if use_llm is None else use_llm
-        if want_llm and llm_available(provider):
+        llm_attempted = want_llm and llm_available(provider)
+        if llm_attempted:
             if deep:
                 try:
                     candidate = run_chain(text, style=style, provider=provider)
@@ -207,6 +219,29 @@ class Naturalizer:
                 if candidate_provider:
                     candidate, llm_provider = candidate_provider
                     llm_method = "single"
+            # Full re-author is not allowed to silently become synonym
+            # swapping. When the first candidate reuses too much source
+            # phrasing, request one focused replacement before accepting it.
+            if candidate and rewrite_mode == "full" and _requires_full_rewrite_retry(text, candidate):
+                retry_instruction = "\n\n".join(part for part in (
+                    instruction,
+                    "The previous rewrite was too close to the draft. Replace it completely: rebuild every sentence and do not reuse five-word sequences from the draft except required names, numbers, quotations, or technical terms.",
+                ) if part)
+                retry_provider = rewrite_with_llm_details(
+                    text,
+                    style=style,
+                    provider=provider,
+                    instruction=retry_instruction,
+                    voice=rng.randrange(1, 5),
+                )
+                if retry_provider:
+                    candidate, llm_provider = retry_provider
+                    llm_method = "single_retry"
+                if _requires_full_rewrite_retry(text, candidate):
+                    llm_warning = (
+                        "The configured model returned a rewrite that still shares too much source phrasing "
+                        "after a strict retry. Review the source-replacement metric or try another configured model."
+                    )
             # *llm_provider* already holds the provider that actually
             # served (failover-aware): when the user asked for cx but
             # cx was rate-limited, this is "claude" — never a lie.
@@ -234,7 +269,11 @@ class Naturalizer:
         # recovered on the failover provider stays quiet — the text is
         # real and served, no scare message needed. (Auto mode is designed
         # to fall back, so it stays quiet too.)
-        llm_warning: Optional[str] = None
+        if rewrite_mode == "full" and llm_attempted and not llm_used:
+            llm_warning = llm_warning or (
+                "Full re-author needs a working LLM result. The fallback did not meet the "
+                "source-replacement target, so review the output or select a configured model."
+            )
         if want_llm and provider != "auto" and not llm_used:
             try:
                 from .llm import PROVIDER_NAMES
@@ -282,12 +321,19 @@ class Naturalizer:
         )
         from .human_memory import plain_register_score
 
+        overlap = _ngram_overlap(text, chosen or text)
+        full_retry_needed = rewrite_mode == "full" and _requires_full_rewrite_retry(text, chosen or text)
         metrics = {
             "before": report.metrics,
             "after": after_report.metrics,
             "after_score": after_report.score,
             "rewrite_mode": rewrite_mode,
-            "source_overlap": _ngram_overlap(text, chosen or text),
+            "source_overlap": overlap,
+            "rewrite_quality": {
+                "status": "review" if full_retry_needed else "verified",
+                "full_reauthor_target": rewrite_mode == "full",
+                "needs_review": full_retry_needed,
+            },
             "detector_comparison": {
                 "before": {
                     "score": report.score,
@@ -389,6 +435,12 @@ class Naturalizer:
             # surface an explicit uncertain verdict and cap confidence.
             verdict = "uncertain"
             confidence = min(confidence, 45)
+        elif verdict == "human":
+            # A local heuristic can say the prose looks human-like, but it
+            # cannot prove independent human authorship. Keep the verdict for
+            # usability, cap confidence, and let provenance override it when
+            # the application knows it generated the exact text.
+            confidence = min(confidence, 70)
         return {
             "score": report.score,
             "verdict": verdict,

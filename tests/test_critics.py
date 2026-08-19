@@ -116,6 +116,13 @@ class RankCandidatesTest(unittest.TestCase):
         self.assertEqual(best, faithful)
         self.assertTrue(any(w["kind"] == "fact_drift" for w in warnings))
 
+    def test_lower_overlap_faithful_candidate_beats_near_copy(self):
+        orig = "Technology affects everyday life, from work and study to the way people stay in touch with friends."
+        near_copy = "Technology affects everyday life, from work and study to the way people stay in touch with friends."
+        full_rewrite = "Digital tools now shape how people learn, earn a living, and keep up with the people close to them."
+        best, _ = rank_candidates(orig, [near_copy, full_rewrite])
+        self.assertEqual(best, full_rewrite)
+
     def test_empty_pool_returns_none(self):
         best, warnings = rank_candidates("Some text.", [])
         self.assertIsNone(best)
