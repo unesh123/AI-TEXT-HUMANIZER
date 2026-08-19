@@ -480,7 +480,10 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         m = body.get("metrics")
         self.assertIsNotNone(m)
-        self.assertEqual(set(m), {"before", "after", "after_score", "plain_register"})
+        self.assertEqual(
+            set(m),
+            {"before", "after", "after_score", "plain_register", "semantic_preservation"},
+        )
         self.assertIn("before", m["plain_register"])
         self.assertIn("after", m["plain_register"])
         self.assertEqual(

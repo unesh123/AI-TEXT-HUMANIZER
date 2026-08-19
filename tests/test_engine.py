@@ -166,7 +166,10 @@ class EngineTest(unittest.TestCase):
         )
         result = self.engine.naturalize(text, style="academic")
         m = result.metrics
-        self.assertEqual(set(m), {"before", "after", "after_score", "plain_register"})
+        self.assertEqual(
+            set(m),
+            {"before", "after", "after_score", "plain_register", "semantic_preservation"},
+        )
         self.assertEqual(
             set(m["before"]),
             {"perplexity", "burstiness", "syntactic", "coherence", "word_choice"},
@@ -180,6 +183,23 @@ class EngineTest(unittest.TestCase):
         # Verification score is a real 0-100 number.
         self.assertIsInstance(m["after_score"], int)
         self.assertTrue(0 <= m["after_score"] <= 100)
+
+    def test_number_drift_falls_back_to_safe_rewrite(self):
+        import naturalizer.engine as eng
+
+        original = "The pilot reduced costs by 42% across 800 accounts."
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng,
+            "rewrite_with_llm_details",
+            return_value=("The pilot reduced costs across many accounts.", "claude"),
+        ):
+            result = self.engine.naturalize(original, provider="claude")
+
+        shown = result.llm_rewritten if result.llm_used else result.rewritten
+        self.assertIn("42%", shown)
+        self.assertIn("800", shown)
+        self.assertIn("fact-preserving", result.llm_warning or "")
+        self.assertFalse(result.metrics["semantic_preservation"]["hard_drift"])
 
     def test_metrics_plain_register_shifts_toward_human_memory(self):
         # Stiff, Latinate register -> the deterministic rewrite should move

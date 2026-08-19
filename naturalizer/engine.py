@@ -19,6 +19,7 @@ from .detectors import (
     sentence_distribution,
 )
 from .diff import word_diff
+from .critics import preservation_issues
 from .styles import DEFAULT_STYLE, get_style
 from .transforms import rewrite as deterministic_rewrite
 
@@ -223,9 +224,25 @@ class Naturalizer:
             except Exception:  # pragma: no cover - defensive
                 pass
 
+        # Semantic-preservation gate: a fluent rewrite that drops a number
+        # is still wrong. Revert hard factual drift before returning it.
+        deterministic_semantic_issues = preservation_issues(text, rewritten or text)
+        if any(issue.get("severity") == "high" for issue in deterministic_semantic_issues):
+            rewritten = text
+            deterministic_semantic_issues = preservation_issues(text, rewritten)
+        llm_semantic_issues = []
+        if llm_used and llm_rewritten:
+            llm_semantic_issues = preservation_issues(text, llm_rewritten)
+            if any(issue.get("severity") == "high" for issue in llm_semantic_issues):
+                llm_rewritten = rewritten
+                llm_warning = (
+                    (llm_warning + " ") if llm_warning else ""
+                ) + "LLM output was replaced by a fact-preserving rewrite because it changed a number."
+                llm_semantic_issues = preservation_issues(text, llm_rewritten)
         # Post-rewrite verification scan: re-run the advanced signals on the
         # text the user will actually see, so the UI can show before/after.
         chosen = llm_rewritten if llm_used else rewritten
+        semantic_issues = preservation_issues(text, chosen or text)
         after_report = analyze(
             chosen or text,
             allowlist=profile["allowlist"],
@@ -243,6 +260,12 @@ class Naturalizer:
             "plain_register": {
                 "before": round(plain_register_score(text), 3),
                 "after": round(plain_register_score(chosen or text), 3),
+            },
+            "semantic_preservation": {
+                "issues": semantic_issues,
+                "hard_drift": any(i.get("severity") == "high" for i in semantic_issues),
+                "deterministic_issues": deterministic_semantic_issues,
+                "llm_issues": llm_semantic_issues,
             },
         }
 
