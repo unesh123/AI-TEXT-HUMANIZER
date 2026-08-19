@@ -62,6 +62,8 @@ INDEX_HTML = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
 STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 engine = Naturalizer(seed=0)
+_STARTED_AT = time.time()
+_INVALID_JSON = object()
 
 DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024  # 10 MiB
 DEFAULT_MAX_JSON = 2 * 1024 * 1024  # 2 MiB
@@ -184,6 +186,14 @@ def _safe_stem(filename: str) -> str:
     return clean or "document"
 
 
+def _normalize_style(value):
+    """Normalize a style label while preserving strict validation."""
+    if not isinstance(value, str):
+        return None
+    style = value.strip().lower()
+    return style if style in STYLES else None
+
+
 def _normalize_provider(value) -> str:
     """Validate a provider choice from a request."""
     value = (value or "auto").lower().strip()
@@ -211,19 +221,6 @@ def _normalize_seed(value) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, seed)
-
-
-def _normalize_style(value, default: str = "academic"):
-    """Normalize and validate a style label from a request.
-
-    Accepts any capitalisation (e.g. ``Academic``, ``BUSINESS``) and returns
-    the canonical lowercase key, or *None* if the value is unrecognised so the
-    caller can reject it with a 400 response.
-    """
-    raw = (value or default).strip().lower()
-    if raw in STYLES:
-        return raw
-    return None
 
 
 def _save_history(
@@ -299,7 +296,7 @@ def _load_body(handler: BaseHTTPRequestHandler):
         data = json.loads(raw.decode("utf-8"))
         return data if isinstance(data, dict) else {}
     except (ValueError, UnicodeDecodeError):
-        return {}
+        return _INVALID_JSON
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -421,6 +418,7 @@ class Handler(BaseHTTPRequestHandler):
         headers = {
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
             "Access-Control-Max-Age": "86400",
             "Content-Length": "0",
         }
@@ -442,6 +440,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send_css(STYLE_CSS.encode("utf-8"))
         elif path == "/api/status":
             self._send_json(200, self._status())
+        elif path in ("/api/health", "/healthz"):
+            state_dir = os.environ.get("NATURALIZER_STATE_DIR", str(ROOT / "state"))
+            self._send_json(200, {
+                "status": "ok",
+                "service": "naturalizer",
+                "version": __version__,
+                "uptime_seconds": round(max(0.0, time.time() - _STARTED_AT), 3),
+                "checks": {
+                    "engine": True,
+                    "state_directory": os.path.isdir(state_dir) or os.access(os.path.dirname(state_dir) or ".", os.W_OK),
+                },
+            })
         elif path == "/api/benchmark":
             from naturalizer.benchmark import run_benchmark
 
@@ -505,12 +515,18 @@ class Handler(BaseHTTPRequestHandler):
             if data is None:
                 self._send_json(413, {"error": "request body too large"})
                 return
+            if data is _INVALID_JSON:
+                self._send_json(400, {"error": "invalid JSON body"})
+                return
             self._handle_stream(data)
             return
 
         data = _load_body(self)
         if data is None:
             self._send_json(413, {"error": "request body too large"})
+            return
+        if data is _INVALID_JSON:
+            self._send_json(400, {"error": "invalid JSON body"})
             return
 
         if path == "/api/history/clear":
@@ -558,9 +574,10 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
                 return
-            style = _normalize_style(data.get("style"))
+            style_raw = data.get("style", "academic")
+            style = _normalize_style(style_raw)
             if style is None:
-                self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
             self._send_json(200, engine.detect(text, style=style))
         elif path == "/api/perfect":
@@ -568,9 +585,10 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
                 return
-            style = _normalize_style(data.get("style"))
+            style_raw = data.get("style", "academic")
+            style = _normalize_style(style_raw)
             if style is None:
-                self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
             features = plan_features()
             if not features["llm"]:
@@ -611,9 +629,10 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
                 return
-            style = _normalize_style(data.get("style"))
+            style_raw = data.get("style", "academic")
+            style = _normalize_style(style_raw)
             if style is None:
-                self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
             from naturalizer.compare import run_comparison
 
@@ -626,9 +645,10 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
                 return
-            style = _normalize_style(data.get("style"))
+            style_raw = data.get("style", "academic")
+            style = _normalize_style(style_raw)
             if style is None:
-                self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
             features = plan_features()
             plan_note = None
@@ -684,9 +704,10 @@ class Handler(BaseHTTPRequestHandler):
                     "plan": plan_status(),
                 })
                 return
-            style = _normalize_style(data.get("style"))
+            style_raw = data.get("style", "academic")
+            style = _normalize_style(style_raw)
             if style is None:
-                self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
             use_llm = data.get("use_llm")
             deep = bool(data.get("deep"))
@@ -715,9 +736,10 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(text, str) or not text.strip():
             self._send_json(400, {"error": "missing or empty 'text'"})
             return
-        style = _normalize_style(data.get("style"))
+        style_raw = data.get("style", "academic")
+        style = _normalize_style(style_raw)
         if style is None:
-            self._send_json(400, {"error": f"unknown style '{data.get('style')}'", "styles": STYLE_NAMES})
+            self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
             return
         features = plan_features()
         plan_note = None
@@ -900,11 +922,12 @@ class Handler(BaseHTTPRequestHandler):
         if file_data is None:
             self._send_json(400, {"error": "missing 'file' part"})
             return
-        raw_style = style
-        style = _normalize_style(style) if style else "academic"
-        if raw_style and style is None:
-            self._send_json(400, {"error": f"unknown style '{raw_style}'", "styles": STYLE_NAMES})
-            return
+        if style:
+            normalized_style = _normalize_style(style)
+            if normalized_style is None:
+                self._send_json(400, {"error": f"unknown style '{style}'", "styles": STYLE_NAMES})
+                return
+            style = normalized_style
 
         fmt = detect_format(file_name, file_data)
         try:

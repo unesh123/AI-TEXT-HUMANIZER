@@ -83,12 +83,46 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status["name"], "naturalizer")
         self.assertIn("academic", status["styles"])
 
+    def test_health_endpoint(self):
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/api/health", timeout=10
+        ) as resp:
+            health = json.loads(resp.read().decode("utf-8"))
+        self.assertEqual(health["status"], "ok")
+        self.assertEqual(health["service"], "naturalizer")
+        self.assertIn("uptime_seconds", health)
+        self.assertTrue(health["checks"]["engine"])
+
     def test_index_served(self):
         with urllib.request.urlopen(
             f"http://127.0.0.1:{self.port}/", timeout=10
         ) as resp:
             html = resp.read().decode("utf-8")
         self.assertIn("Naturalizer", html)
+
+    def test_invalid_json_returns_bad_request(self):
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/naturalize",
+            data=b"{not-json}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=10)
+        self.assertEqual(ctx.exception.code, 400)
+        body = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertEqual(body["error"], "invalid JSON body")
+
+    def test_cors_preflight(self):
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/naturalize",
+            headers={"Origin": "http://127.0.0.1:3000", "Access-Control-Request-Method": "POST"},
+            method="OPTIONS",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            self.assertEqual(resp.status, 204)
+            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "http://127.0.0.1:3000")
+            self.assertIn("POST", resp.headers.get("Access-Control-Allow-Methods", ""))
 
     def test_naturalize_endpoint(self):
         status, body = self._post(
@@ -198,6 +232,22 @@ class ServerTest(unittest.TestCase):
         status, body = self._post("/api/naturalize", {"text": ""})
         self.assertEqual(status, 400)
         self.assertIn("error", body)
+
+    def test_naturalize_accepts_case_insensitive_style(self):
+        status, body = self._post(
+            "/api/naturalize",
+            {"text": "Furthermore, the data was noisy.", "style": "Academic"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["style"], "academic")
+
+    def test_detect_accepts_case_insensitive_style(self):
+        status, body = self._post(
+            "/api/detect",
+            {"text": "Furthermore, the data was noisy.", "style": " BUSINESS "},
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("verdict", body)
 
     def test_naturalize_rejects_bad_style(self):
         status, body = self._post(

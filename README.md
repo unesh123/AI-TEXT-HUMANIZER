@@ -829,3 +829,18 @@ tools/           # ui_check.mjs — headless-browser UI verification driver
   invents content. Use it as a polish pass, not a content generator.
 - The detector is a heuristic, not a detector of any specific platform.
   Scores reflect writing style only.
+
+
+## Production deployment additions
+
+The server now exposes `GET /api/health` and `/healthz` for container and reverse-proxy health checks. A healthy response includes the service version, uptime, engine status, and state-directory check. Malformed JSON requests return a clear `400` response with `{"error":"invalid JSON body"}` instead of being silently treated as an empty payload. CORS preflight requests are supported for explicitly allowed origins.
+
+A minimal non-root container image is provided in `Dockerfile`, with a built-in healthcheck and persistent state directory. Copy `.env.example` to `.env.local` for local configuration, and keep real provider keys out of Git. For a local container run:
+
+```bash
+docker build -t naturalizer .
+docker run --rm -p 8000:8000 -v naturalizer-state:/app/state naturalizer
+curl http://127.0.0.1:8000/api/health
+```
+
+For public deployment, place the server behind a TLS-terminating reverse proxy, set `HOST=0.0.0.0`, configure `ALLOWED_ORIGINS` explicitly, mount `/app/state` as persistent storage, and provide provider credentials through the platform’s secret manager rather than a committed file. The included server is suitable as a compact application service; production deployments should still add platform-level TLS, backups, monitoring, and log retention.

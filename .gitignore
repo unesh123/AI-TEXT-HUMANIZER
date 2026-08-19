@@ -5,6 +5,7 @@ state/
 .env
 .env.local
 .env.*
+!.env.example
 
 # Python caches
 __pycache__/

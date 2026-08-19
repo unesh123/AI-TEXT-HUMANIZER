@@ -1,0 +1,10 @@
+.git
+.env
+.env.local
+state/
+__pycache__/
+*.pyc
+.pytest_cache/
+.smoke/
+ui-export-check/
+*.log
