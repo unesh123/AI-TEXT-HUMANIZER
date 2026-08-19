@@ -482,7 +482,7 @@ class ServerTest(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap"},
         )
         self.assertIn("before", m["plain_register"])
         self.assertIn("after", m["plain_register"])

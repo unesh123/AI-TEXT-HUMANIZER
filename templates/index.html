@@ -1264,6 +1264,17 @@ function renderMetrics(r) {
       <div class="comparison-row"><span>after</span><div class="track"><div class="fill fill-after" style="width:${afterScore}%"></div></div><b>${Math.round(afterScore)}</b></div>`;
     grid.appendChild(cell);
   }
+  const overlap = m.source_overlap || {};
+  if (overlap.reuse_percent !== undefined) {
+    const cell = document.createElement("div");
+    cell.className = "metric reveal-up";
+    const reuse = Math.max(0, Math.min(100, Number(overlap.reuse_percent) || 0));
+    cell.innerHTML = `
+      <div class="metric-head"><strong>Source replacement</strong><span class="metric-delta ${reuse <= 20 ? "up" : "down"}">${Math.round(100 - reuse)}% new phrasing</span></div>
+      <div class="metric-desc">five-word sequences reused from the source; names and technical terms may remain</div>
+      <div class="comparison-row"><span>reused</span><div class="track"><div class="fill ${reuse <= 20 ? "fill-after" : "fill-before"}" style="width:${reuse}%"></div></div><b>${Math.round(reuse)}%</b></div>`;
+    grid.appendChild(cell);
+  }
   if (pr.before !== undefined && pr.after !== undefined) {
     const pb = Math.round((pr.before || 0) * 100);
     const pa = Math.round((pr.after || 0) * 100);

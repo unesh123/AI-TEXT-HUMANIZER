@@ -9,6 +9,7 @@ rewrite, which callers can prefer.
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -22,6 +23,22 @@ from .diff import word_diff
 from .critics import preservation_issues
 from .styles import DEFAULT_STYLE, get_style
 from .transforms import rewrite as deterministic_rewrite
+
+
+def _ngram_overlap(original: str, rewritten: str, n: int = 5) -> Dict[str, float]:
+    """Measure consecutive-word reuse, separate from semantic preservation."""
+    def grams(value: str) -> set:
+        words = re.findall(r"[A-Za-z0-9']+", value.lower())
+        return {tuple(words[i:i + n]) for i in range(max(0, len(words) - n + 1))}
+    source = grams(original)
+    output = grams(rewritten)
+    shared = len(source & output)
+    return {
+        "source_ngrams": len(source),
+        "output_ngrams": len(output),
+        "shared_ngrams": shared,
+        "reuse_percent": round((shared / len(source)) * 100, 1) if source else 0.0,
+    }
 
 try:
     from .llm import llm_available, llm_provider_label, rewrite_with_llm, rewrite_with_llm_details
@@ -255,6 +272,7 @@ class Naturalizer:
             "before": report.metrics,
             "after": after_report.metrics,
             "after_score": after_report.score,
+            "source_overlap": _ngram_overlap(text, chosen or text),
             "detector_comparison": {
                 "before": {
                     "score": report.score,

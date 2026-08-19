@@ -168,7 +168,7 @@ class EngineTest(unittest.TestCase):
         m = result.metrics
         self.assertEqual(
             set(m),
-            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation"},
+            {"before", "after", "after_score", "detector_comparison", "plain_register", "semantic_preservation", "source_overlap"},
         )
         self.assertEqual(
             set(m["before"]),
@@ -183,6 +183,16 @@ class EngineTest(unittest.TestCase):
         # Verification score is a real 0-100 number.
         self.assertIsInstance(m["after_score"], int)
         self.assertTrue(0 <= m["after_score"] <= 100)
+
+    def test_source_overlap_is_reported(self):
+        result = self.engine.naturalize(
+            "Technology helps students find information online, but too much reliance can create problems.",
+            use_llm=False,
+        )
+        overlap = result.metrics["source_overlap"]
+        self.assertIn("reuse_percent", overlap)
+        self.assertGreaterEqual(overlap["reuse_percent"], 0)
+        self.assertLessEqual(overlap["reuse_percent"], 100)
 
     def test_number_drift_falls_back_to_safe_rewrite(self):
         import naturalizer.engine as eng
