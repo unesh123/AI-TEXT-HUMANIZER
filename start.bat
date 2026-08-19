@@ -1,15 +1,15 @@
 @echo off
 setlocal EnableExtensions
-title Naturalizer
+title AI Text Humanizer
 cd /d "%~dp0"
 
 echo.
-echo  ============================================
-echo    Naturalizer  -  AI text humanizer
-echo  ============================================
+echo  =====================================================
+echo    AI Text Humanizer  ^|  Powered by Naturalizer
+echo  =====================================================
 echo.
 
-REM ---------- 1. Find a working Python ---------------------------------
+REM ---------- 1. Find a working Python ----------------------------------
 set "PY="
 where python >nul 2>nul && set "PY=python"
 if not defined PY (
@@ -19,10 +19,6 @@ if defined PY (
     %PY% --version >nul 2>nul || set "PY="
 )
 if not defined PY (
-    where py >nul 2>nul && set "PY=py -3"
-)
-%PY% --version >nul 2>nul
-if errorlevel 1 (
     echo  [ERROR] Python was not found or is not usable.
     echo  Install Python 3.9 or newer from https://www.python.org/downloads/
     echo  and tick "Add python.exe to PATH" during setup, then run this again.
@@ -31,27 +27,45 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM ---------- 2. Pick a port (8000, or the next free one) ----------------
-if not defined PORT set "PORT=8000"
-:pickport
-netstat -ano | findstr /r /c:":%PORT% .*LISTENING" >nul 2>nul
-if errorlevel 1 goto portfree
-set /a PORT+=1
-if %PORT% gtr 8999 (
-    echo  [ERROR] No free port between 8000 and 8999.
-    pause
-    exit /b 1
-)
-goto pickport
-:portfree
-
-REM ---------- 3. Start the server and open the browser -------------------
-echo  Starting Naturalizer on http://127.0.0.1:%PORT% ...
-echo  Keep this window open. Press Ctrl+C to stop the server.
+echo  [OK] Found Python:
+%PY% --version
 echo.
+
+REM ---------- 2. Kill any existing server on port 8000 ------------------
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+    echo  [INFO] Killing existing process on port 8000 (PID %%a)...
+    taskkill /F /PID %%a >nul 2>nul
+)
+
+REM ---------- 3. Pick a free port (8000 first, then 8001..8099) ---------
+set "PORT=8000"
+:pickport
+netstat -ano 2>nul | findstr /r /c:":%PORT% .*LISTENING" >nul 2>nul
+if not errorlevel 1 (
+    set /a PORT+=1
+    if %PORT% gtr 8099 (
+        echo  [ERROR] No free port found between 8000 and 8099.
+        pause
+        exit /b 1
+    )
+    goto pickport
+)
+
+REM ---------- 4. Open browser after a short delay -----------------------
+echo  [INFO] Starting server on http://127.0.0.1:%PORT% ...
+echo  [INFO] Your browser will open automatically in 2 seconds.
+echo.
+echo  -------------------------------------------------------
+echo   Press Ctrl+C in this window to stop the server.
+echo  -------------------------------------------------------
+echo.
+
 start "" /min cmd /c "ping -n 3 127.0.0.1 >nul & start http://127.0.0.1:%PORT%/ & exit"
+
+REM ---------- 5. Launch server ------------------------------------------
+set PORT=%PORT%
 %PY% server.py
 
 echo.
-echo  Server stopped.
+echo  [INFO] Server stopped.
 pause
