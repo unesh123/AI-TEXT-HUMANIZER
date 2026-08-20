@@ -86,6 +86,40 @@ class FeedbackLoopTest(unittest.TestCase):
         self.assertEqual(result["text"], "")
         self.assertEqual(result["passes"], 0)
 
+    def test_result_reports_full_convergence_gate(self):
+        """Completion is a full quality gate, not only a naturalness score."""
+        engine = Naturalizer(prefer_llm=False)
+        result = feedback_humanize(engine, AI_SAMPLE, style="academic")
+        self.assertIn("converged", result)
+        self.assertIn("remaining", result)
+        self.assertIn("signals", result["remaining"])
+        self.assertIn("regions", result["remaining"])
+        self.assertIn("plain_register", result["remaining"])
+        self.assertIsInstance(result["converged"], bool)
+
+    def test_score_alone_does_not_mark_feedback_complete(self):
+        """A high reported rewrite score cannot bypass unresolved AI tells."""
+        engine = Naturalizer(prefer_llm=False)
+
+        def fake_naturalize(text, **kwargs):
+            return NaturalizeResult(
+                original=text,
+                rewritten=AI_SAMPLE,
+                score=100,
+                llm_rewritten=None,
+                llm_used=False,
+                llm_method=None,
+                llm_warning=None,
+                style=kwargs.get("style", "academic"),
+                intensity=kwargs.get("intensity", 0.5),
+            )
+
+        with mock.patch.object(engine, "naturalize", side_effect=fake_naturalize):
+            result = feedback_humanize(engine, AI_SAMPLE, style="academic", max_passes=1)
+
+        self.assertFalse(result["converged"])
+        self.assertLess(result["scores"][-1], HUMAN_FLOOR)
+
     def test_metrics_carry_plain_register(self):
         """The loop result reports the verified human-writing memory shift
         (before on the original, after on the converged text) so the UI can
