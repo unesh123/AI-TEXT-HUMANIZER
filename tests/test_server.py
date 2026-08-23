@@ -801,6 +801,16 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 500)
         self.assertEqual(body["error"], "internal server error")
 
+    def test_import_url_rejects_empty_or_invalid_url(self) -> None:
+        status, body = self._post("/api/import-url", {})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
+
+        status, body = self._post("/api/import-url", {"url": "not-a-url"})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
+
 
 if __name__ == "__main__":
     unittest.main()
+

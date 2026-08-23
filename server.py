@@ -606,6 +606,47 @@ class Handler(BaseHTTPRequestHandler):
 
             self._send_json(200, {"results": scan_live(text)})
             return
+        if path == "/api/import-url":
+            url = (data.get("url") or "").strip()
+            if not url or not url.startswith(("http://", "https://")):
+                self._send_json(400, {"error": "Provide a valid http/https URL."})
+                return
+            try:
+                import urllib.request as _ureq
+                import html as _html
+                import re as _re
+                req = _ureq.Request(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; Naturalizer/1.0)",
+                        "Accept": "text/html,application/xhtml+xml,*/*",
+                    },
+                )
+                with _ureq.urlopen(req, timeout=10) as resp:
+                    raw = resp.read(1_000_000).decode("utf-8", errors="replace")
+                # Remove script/style blocks
+                raw = _re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", raw)
+                # Remove HTML tags
+                text = _re.sub(r"<[^>]+>", " ", raw)
+                # Decode HTML entities
+                text = _html.unescape(text)
+                # Collapse whitespace
+                text = _re.sub(r"[ \t]+", " ", text)
+                text = _re.sub(r"\n{3,}", "\n\n", text)
+                # Trim long lines (navigation junk) - keep only paragraphs with >= 40 chars
+                lines = [l.strip() for l in text.splitlines()]
+                lines = [l for l in lines if len(l) >= 40]
+                text = "\n\n".join(lines).strip()
+                if not text:
+                    self._send_json(422, {"error": "No readable text found at that URL. Try a different page."})
+                    return
+                # Trim to 10,000 chars to avoid huge payloads
+                if len(text) > 10000:
+                    text = text[:10000] + "\n\n[... text truncated at 10,000 chars ...]"
+                self._send_json(200, {"text": text, "url": url, "chars": len(text)})
+            except Exception as exc:
+                self._send_json(502, {"error": f"Could not fetch URL: {exc}"})
+            return
         if path == "/api/export":
             self._handle_export(data)
         elif path == "/api/plagiarism":
