@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Naturalizer — humanize AI text into natural human prose and detect AI-written content with a full-band analysis.">
-<meta name="theme-color" content="#0b0b16">
+<meta name="theme-color" content="#0a0a12">
 <title>Naturalizer — AI Humanizer &amp; Detector</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239333EA'/%3E%3Cstop offset='1' stop-color='%23EC4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='18' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='18' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="brand-logo">N</span>
-      <span class="brand-name">Naturalizer</span>
+      <span class="brand-name"><span>Natural</span>izer</span>
       <button type="button" class="brand-collapse" id="collapse-sidebar" title="Collapse sidebar" aria-label="Collapse sidebar">◀</button>
     </div>
 
@@ -24,16 +24,14 @@
         <div class="nav-item"><span class="nav-ico">🏠</span><span class="nav-txt">Home</span></div>
       </div>
       <div class="nav-section">
-        <div class="nav-heading">AI HUMANIZE &amp; DETECT</div>
+        <div class="nav-heading">Tools</div>
         <div class="nav-item" id="nav-humanizer"><span class="nav-ico">✍️</span><span class="nav-txt">AI Humanizer</span></div>
         <div class="nav-item active" id="nav-detector"><span class="nav-ico">🔍</span><span class="nav-txt">AI Detector</span></div>
       </div>
       <div class="nav-section">
-        <div class="nav-heading">AI LEARNING</div>
+        <div class="nav-heading">Coming Soon</div>
         <div class="nav-item disabled"><span class="nav-ico">▶️</span><span class="nav-txt">YouTube Transcript</span></div>
         <div class="nav-item disabled"><span class="nav-ico">🧠</span><span class="nav-txt">AI Notes Generator</span></div>
-      </div>
-      <div class="nav-section">
         <div class="nav-item disabled"><span class="nav-ico">🧩</span><span class="nav-txt">Plugins</span></div>
       </div>
     </nav>
@@ -52,8 +50,9 @@
   <!-- ======================= Main ======================= -->
   <main class="main">
     <header class="hero">
-      <h1 class="hero-title">AI <span class="grad">Humanizer</span> &amp; <span class="grad">AI Detector</span> Online</h1>
-      <p class="hero-sub">Make machine prose read human — then verify it. Paste text or upload a file to humanize it, and check whether text was written by AI or a human, with sentence-level highlights and a naturalness score.</p>
+      <div class="hero-eyebrow">AI-Powered Writing Tool</div>
+      <h1 class="hero-title">Make Your Text Sound<br><span class="grad">Authentically Human</span></h1>
+      <p class="hero-sub">Paste any AI-generated text and transform it into natural, human-sounding prose — then verify it with our built-in detector.</p>
       <div class="mode-tabs" role="tablist">
         <button type="button" class="mode-tab" id="tab-humanizer" role="tab">✍️&nbsp; AI Humanizer</button>
         <button type="button" class="mode-tab active" id="tab-detector" role="tab">🔍&nbsp; AI Detector</button>
@@ -66,7 +65,7 @@
       <!-- ======================= Content card ======================= -->
       <div class="card" id="content-card">
         <div class="card-head">
-          <h2>Content</h2>
+          <h2>Input</h2>
           <div class="card-head-actions">
             <button type="button" class="icon-btn" id="copy-input" title="Copy input" aria-label="Copy input">⧉</button>
             <button type="button" class="icon-btn" id="clear-input" title="Clear" aria-label="Clear input">🗑</button>
@@ -75,12 +74,12 @@
 
         <div class="upload" id="upload">
           <input type="file" id="file" accept=".txt,.md,.markdown,.docx,.pdf" hidden>
-          <button type="button" id="pick" class="ghost small">Upload TXT / MD / DOCX / PDF</button>
-          <span class="upload-note">Drop a file on this box, or click to browse. Its text is extracted, then you humanize or detect it like any draft.</span>
+          <button type="button" id="pick" class="ghost small">📎 Upload file</button>
+          <span class="upload-note">TXT / MD / DOCX / PDF — drop here or click to browse</span>
         </div>
 
         <div class="editor-wrap" id="editor-wrap">
-          <textarea id="input" rows="14" placeholder="Paste a draft that reads a bit robotic…"></textarea>
+          <textarea id="input" rows="14" placeholder="Paste your AI-generated text here…"></textarea>
           <div id="highlighted" class="highlighted" hidden></div>
           <button type="button" class="ghost small edit-toggle" id="edit-toggle" hidden>✎ Edit original text</button>
         </div>
@@ -92,7 +91,7 @@
             <button type="button" class="primary" id="run">Detect AI</button>
           </div>
         </div>
-        <p class="hint" id="hint">Tip: the sample below is stuffed with common AI tells. Hit Detect AI to see what the detector flags.</p>
+        <p class="hint" id="hint">Paste a draft and hit Detect AI — or upload a file.</p>
         <div id="warnings" hidden></div>
       </div>
 
@@ -101,14 +100,14 @@
         <div class="card-head">
           <h2>Result</h2>
           <div class="card-head-actions">
-            <button type="button" class="ghost small" id="perfect-btn" title="Run the live feedback loop: rewrite, re-scan, fix remaining tells, repeat until it reads human">⚡ Perfect humanize</button>
-            <button type="button" class="ghost small" id="compare-btn" title="Run the same input through every configured humanizer and rank the results — pick the best version">⚖ Compare</button>
-            <button type="button" class="ghost small" id="bench-btn" title="Run the detector against the labeled corpus and report its accuracy">📊 Accuracy</button>
-            <button type="button" class="ghost small" id="again-btn" title="Humanize the current result again — more aggressively, different words">↻ Humanize again</button>
-            <button type="button" class="ghost small" id="history-btn" title="Saved runs — input, rewrite and scores">🕘 History</button>
-            <button type="button" class="ghost small" id="detectors-btn" title="Check which AI detectors are configured and live">🔌 Detectors</button>
-            <button type="button" class="ghost small" id="share-btn" title="Copy result" aria-label="Copy result">Share</button>
-            <button type="button" class="ghost small" id="download-pdf">Download PDF</button>
+            <button type="button" class="ghost small" id="perfect-btn" title="Run live feedback loop: rewrite → re-scan → fix → repeat">⚡ Perfect</button>
+            <button type="button" class="ghost small" id="compare-btn" title="Compare every configured humanizer">⚖ Compare</button>
+            <button type="button" class="ghost small" id="bench-btn" title="Run detector accuracy benchmark">📊 Stats</button>
+            <button type="button" class="ghost small" id="again-btn" title="Humanize again — different words">↻ Again</button>
+            <button type="button" class="ghost small" id="history-btn" title="View saved runs">🕘 History</button>
+            <button type="button" class="ghost small" id="detectors-btn" title="Check detector status">🔌 Detectors</button>
+            <button type="button" class="ghost small" id="share-btn" title="Copy result">⧉ Copy</button>
+            <button type="button" class="ghost small" id="download-pdf">↓ PDF</button>
           </div>
         </div>
 
@@ -136,7 +135,7 @@
               <b id="dist-ai-num">0%</b>
             </div>
             <div class="dist-row">
-              <span class="dist-label"><i class="dot dot-orange"></i> Mix-generated</span>
+              <span class="dist-label"><i class="dot dot-orange"></i> Mixed</span>
               <div class="dist-track"><div class="dist-fill fill-orange" id="dist-mix" style="width:0%"></div></div>
               <b id="dist-mix-num">0%</b>
             </div>
@@ -165,7 +164,7 @@
           <p class="hint" id="detector-note"></p>
 
           <div class="det-section">
-            <h3>Highlighted AI-generated / paraphrased sentences</h3>
+            <h3>Flagged Sentences</h3>
             <ul class="det-sentences" id="det-sentences"></ul>
           </div>
         </div>
@@ -186,7 +185,7 @@
               <span class="score-cap">plain register</span>
             </div>
             <div class="issues">
-              <h3>What made it sound robotic</h3>
+              <h3>AI Tells Found</h3>
               <ul id="issues"></ul>
             </div>
           </div>
@@ -197,7 +196,7 @@
             <div class="plain-meter-head">
               <div class="plain-meter-title">
                 <strong>Plain register</strong>
-                <span class="plain-meter-desc">everyday words humans actually use — verified against a corpus of real writing</span>
+                <span class="plain-meter-desc">everyday words humans actually use — verified against real writing</span>
               </div>
               <span class="metric-delta" id="plain-meter-delta"></span>
             </div>
@@ -238,7 +237,7 @@
           </div>
 
           <div class="export-bar" id="export-bar" hidden>
-            <span class="export-label">Download result:</span>
+            <span class="export-label">Download:</span>
             <button type="button" class="ghost small" data-fmt="txt">.txt</button>
             <button type="button" class="ghost small" data-fmt="docx">.docx</button>
             <button type="button" class="ghost small" data-fmt="pdf">.pdf</button>
@@ -246,13 +245,13 @@
         </div>
 
         <div id="result-empty" class="result-empty">
-          <div class="empty-art">📄✓</div>
-          <p>Nothing yet — run a check and the result lands here.</p>
+          <div class="empty-art">✦</div>
+          <p>Run a check and the result appears here.</p>
         </div>
       </div>
     </section>
 
-    <!-- ======================= Humanizer controls & extras ======================= -->
+    <!-- ======================= Humanizer controls ======================= -->
     <section class="controls-bar" id="humanizer-controls" hidden>
       <span class="steps" id="steps" hidden>
         <span class="step" data-step="0">Analyzing</span><span class="sep">→</span>
@@ -283,18 +282,18 @@
       </label>
       <label class="check">
         <input type="checkbox" id="use-llm" checked>
-        Use LLM backend (if configured)
+        Use LLM backend
       </label>
-      <label class="check" title="Stream the rewrite word-by-word as it is generated, instead of waiting for the whole result">
+      <label class="check" title="Stream the rewrite word-by-word as it's generated">
         <input type="checkbox" id="stream" checked>
         Stream live
       </label>
-      <label class="check" title="Routes the rewrite through a 4-hop translation chain (English → Chinese → Japanese → Finnish → English) across two different engines — the strongest structural disruption, but noticeably slower.">
+      <label class="check" title="4-hop translation chain — strongest structural disruption, slower">
         <input type="checkbox" id="deep">
         Deep humanize <small>(translation chain)</small>
       </label>
-      <button type="button" class="ghost small" id="vary-btn" title="Run again with a different seed — different word choices and rhythm">↻ Vary</button>
-      <button type="button" class="ghost small" id="cancel-humanize" hidden>Cancel</button>
+      <button type="button" class="ghost small" id="vary-btn" title="Run again with a different seed">↻ Vary</button>
+      <button type="button" class="ghost small" id="cancel-humanize" hidden>✕ Cancel</button>
       <button type="button" class="primary" id="run-humanize">Naturalize</button>
     </section>
 
@@ -302,20 +301,20 @@
       <h3>Batch mode</h3>
       <p class="hint">Paste one document per blank line. Each becomes its own result.</p>
       <textarea id="batch-input" rows="6" placeholder="Document one&#10;&#10;Document two&#10;&#10;Document three"></textarea>
-      <button id="run-batch" class="primary">Naturalize batch</button>
+      <button id="run-batch" class="primary" style="margin-top:10px">Naturalize batch</button>
       <div id="batch-out"></div>
 
-      <h3 style="margin-top:26px">Plagiarism / similarity check</h3>
-      <p class="hint">Compares your text against reference sources (paste them below). Catches verbatim copying before it ever reaches Turnitin — it can only see the sources you provide, not the whole internet.</p>
+      <h3 style="margin-top:28px">Plagiarism / similarity check</h3>
+      <p class="hint">Compares your text against reference sources. Catches verbatim copying — only checks sources you provide.</p>
       <div class="plag-grid">
         <label>Text to check
           <textarea id="plag-text" rows="6" placeholder="Paste the document you want to check…"></textarea>
         </label>
         <label>Reference sources <small>(one per blank line)</small>
-          <textarea id="plag-refs" rows="6" placeholder="Paste the original sources / articles to compare against…"></textarea>
+          <textarea id="plag-refs" rows="6" placeholder="Paste original sources to compare against…"></textarea>
         </label>
       </div>
-      <button id="run-plag" class="primary">Check similarity</button>
+      <button id="run-plag" class="primary" style="margin-top:10px">Check similarity</button>
       <div id="plag-out"></div>
     </section>
   </main>
@@ -324,13 +323,13 @@
 <!-- ======================= Plan modal ======================= -->
 <div class="modal-backdrop" id="plan-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
-    <h3 id="plan-modal-title">🚀 Naturalizer plans</h3>
-    <p class="sub">Start free with the detector and deterministic humanizer; go Pro for the full rewriting engine.</p>
+    <h3 id="plan-modal-title">🚀 Naturalizer Plans</h3>
+    <p class="sub">Start free with the detector and deterministic humanizer. Go Pro for the full rewriting engine.</p>
     <table>
       <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
       <tr><td>AI detector + naturalness score</td><td class="yes">✓</td><td class="yes">✓</td></tr>
       <tr><td>Deterministic humanizer</td><td class="yes">✓ 1,000 words/day</td><td class="yes">✓ unlimited</td></tr>
-      <tr><td>LLM rewrite (Claude / CX gateway / OpenAI / Gemini / Qwen…)</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>LLM rewrite (Claude / CX / OpenAI / Gemini…)</td><td class="no">—</td><td class="yes">✓</td></tr>
       <tr><td>Perfect humanize — live feedback loop</td><td class="no">—</td><td class="yes">✓</td></tr>
       <tr><td>Deep humanize — 4-hop translation chain</td><td class="no">—</td><td class="yes">✓</td></tr>
       <tr><td>Batch mode</td><td class="no">—</td><td class="yes">✓</td></tr>
