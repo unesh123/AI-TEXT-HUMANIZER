@@ -110,6 +110,15 @@
             <button type="button" class="ghost small" id="download-pdf">↓ PDF</button>
           </div>
         </div>
+        <div class="result-actions" id="result-actions" hidden aria-label="Additional result tools">
+          <button type="button" class="ghost small" id="compare-btn" title="Run the same input through every configured humanizer and rank the results">Compare options</button>
+          <button type="button" class="ghost small" id="again-btn" title="Humanize the current result again with a different seed">Humanize again</button>
+          <button type="button" class="ghost small" id="detectors-btn" title="Review detector availability and configured live providers">Detector status</button>
+          <button type="button" class="ghost small" id="bench-btn" title="Run the labeled-corpus benchmark">Accuracy report</button>
+          <button type="button" class="ghost small" id="history-btn" title="Open saved runs">History</button>
+          <button type="button" class="ghost small" id="share-btn" title="Copy result" aria-label="Copy result">Copy result</button>
+          <button type="button" class="ghost small" id="download-pdf">Download PDF</button>
+        </div>
 
         <!-- --- Detector accuracy benchmark --- -->
         <div id="bench-out" hidden></div>
@@ -405,7 +414,12 @@ function setMode(m) {
   $("plain-score-wrap").hidden = true;
   $("metrics").hidden = true;
   $("bench-out").hidden = true;
+  $("perfect-out").hidden = true;
+  $("compare-out").hidden = true;
+  $("detectors-out").hidden = true;
   $("history-out").hidden = true;
+  $("result-actions").hidden = true;
+  $("result-menu").setAttribute("aria-expanded", "false");
   $("hint").textContent = isDet
     ? "Paste a draft and hit Detect AI — or upload a file. The detector tags every sentence as AI / mixed / human and gives an overall verdict."
     : "Tip: the sample below is stuffed with common AI tells. Hit Naturalize to see what happens.";
@@ -491,6 +505,16 @@ function wireTabs() {
   $("nav-detector").addEventListener("click", () => setMode("detector"));
   $("collapse-sidebar").addEventListener("click", () => {
     $("sidebar").classList.toggle("collapsed");
+  });
+  $("result-menu").addEventListener("click", () => {
+    const panel = $("result-actions");
+    const expanded = panel.hidden;
+    panel.hidden = !expanded;
+    $("result-menu").setAttribute("aria-expanded", String(expanded));
+  });
+  $("result-actions").addEventListener("click", () => {
+    $("result-actions").hidden = true;
+    $("result-menu").setAttribute("aria-expanded", "false");
   });
   $("clear-input").addEventListener("click", () => { $("input").value = ""; updateWordCount(); });
   $("copy-input").addEventListener("click", () => {
@@ -793,7 +817,18 @@ function renderPerfect(p, originalText) {
     .map((s, i) => `<span class="pass-score${i === scores.length - 1 ? " pass-final" : ""}">${s}</span>`)
     .join(" → ");
   const passCount = Math.max(1, p.passes || 1);
-  const converged = scores.length && scores[scores.length - 1] >= (p.floor || 80);
+  // The server verifies the full quality gate: score, writing signals,
+  // passage evidence, plain register, and high-severity fact drift. Older
+  // payloads fall back to a conservative score-only display.
+  const converged = p.converged === true;
+  const remaining = p.remaining || {};
+  const remainingNotes = [];
+  if ((remaining.signals || []).length) remainingNotes.push(`signals: ${(remaining.signals || []).join(", ")}`);
+  if ((remaining.regions || []).length) remainingNotes.push(`${(remaining.regions || []).length} flagged passage${(remaining.regions || []).length === 1 ? "" : "s"}`);
+  if (remaining.plain_register !== undefined && remaining.plain_register < (p.plain_floor || 0.78)) {
+    remainingNotes.push("plain-language check");
+  }
+  if ((p.fact_issues || []).some((issue) => issue.severity === "high")) remainingNotes.push("fact preservation");
   const method = p.llm_used
     ? `LLM (${p.method || "single"})`
     : (p.method || "deterministic");
@@ -807,8 +842,8 @@ function renderPerfect(p, originalText) {
         <div class="pass-scores">${trail}</div>
         <p class="pass-status ${converged ? "ok" : "warn"}">
           ${converged
-            ? `Converged after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b> — the re-scan now reads human (floor ${p.floor || 80}).`
-            : `Maxed out after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b> — best score ${scores[scores.length - 1] ?? "—"} (floor ${p.floor || 80}). Try a higher intensity or the LLM path.`}
+            ? `Completed the local quality checks after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b>. The draft cleared the configured score, writing-signal, passage, plain-language, and fact-preservation checks.`
+            : `Stopped after <b>${passCount} pass${passCount === 1 ? "" : "es"}</b>. The current draft is an improved working version, but local checks still need attention${remainingNotes.length ? ` (${esc(remainingNotes.join(" · "))})` : ""}. Review it before using it.`}
         </p>
         <p class="pass-method">engine: ${esc(method)}</p>
         ${p.warning ? `<p class="llm-warn">⚠ ${esc(p.warning)}</p>` : ""}
@@ -818,7 +853,11 @@ function renderPerfect(p, originalText) {
       </div>
       <h4 class="det-head">Detector coverage</h4>
       <div class="det-grid">${detectors}</div>
-      <p class="bench-note">The loop rewrites, re-scans with every configured detector, and feeds remaining tells back into the next pass. Add third-party detector keys (GPTZero, ZeroGPT, Originality.ai) to <code>.env.local</code> to include them in the loop.</p>
+      <p class="bench-note">This is a local writing-quality loop, not a proof of human authorship or a guarantee of any external detector’s result. Review factual details and citations before publishing. Add permitted third-party detector keys to <code>.env.local</code> to compare live scores.</p>
+      <div class="perfect-actions">
+        <button type="button" class="ghost small" id="perfect-use-input">Use as new draft</button>
+        <button type="button" class="ghost small" id="perfect-copy">Copy rewrite</button>
+      </div>
     </div>`;
   out.hidden = false;
   out.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -826,7 +865,14 @@ function renderPerfect(p, originalText) {
   // Show the converged text in the After pane.
   $("analysis").hidden = false;
   $("detector-result").hidden = true;
-  $("export-bar").hidden = true;
+  $("export-bar").hidden = false;
+  lastResult = {
+    original: originalText || "",
+    rewritten: p.text || "",
+    llm_used: false,
+    metrics: p.metrics || {},
+    score: scores[scores.length - 1] ?? 0,
+  };
   $("before").textContent = originalText || "";
   const after = $("after");
   after.textContent = "";
@@ -843,6 +889,16 @@ function renderPerfect(p, originalText) {
   // The loop result carries the same verified human-writing memory metrics
   // as the single-shot path — show the plain-register meter for it too.
   renderPlainMeter(p);
+  $("perfect-use-input").addEventListener("click", () => {
+    $("input").value = p.text || "";
+    $("editor-wrap").classList.remove("show-highlight");
+    $("edit-toggle").hidden = true;
+    updateWordCount();
+    $("hint").textContent = "The refined version is now your working draft. Review details, then run another check if needed.";
+  });
+  $("perfect-copy").addEventListener("click", () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(p.text || "");
+  });
   refreshHistory();
 }
 
@@ -1134,7 +1190,7 @@ function renderDetector(d) {
   $("gauge-num").textContent = isDerived ? "AI" : human + "%";
   $("gauge-cap").textContent = isDerived ? "DERIVED" : "human";
   $("gauge-fill").style.strokeDashoffset = 327 - (327 * human) / 100;
-  const gaugeCls = isDerived ? "g-red" : (human >= 60 ? "g-green" : (human >= 35 ? "g-orange" : "g-red"));
+  const gaugeCls = isDerived ? "red" : (human >= 60 ? "green" : (human >= 35 ? "orange" : "red"));
   $("gauge").className = "gauge " + gaugeCls;
 
   // Verdict banner.
@@ -1192,7 +1248,14 @@ function renderDetector(d) {
     flagged.forEach((s) => {
       const li = document.createElement("li");
       li.className = "det-sent " + (s.label === "ai" ? "ai" : "mix");
-      li.innerHTML = `<span class="det-badge">${s.label === "ai" ? "AI" : "MIX"}</span> <span>${esc(s.sentence)}</span> <small>${esc(s.issues.join(", "))}</small> <button type="button" class="sent-action" data-idx="${s.idx}">↻ humanize</button>`;
+      const issueTags = (s.issues || []).map((issue) => `<span>${esc(issue)}</span>`).join(" ");
+      li.innerHTML = `
+        <span class="det-badge">${s.label === "ai" ? "AI" : "MIX"}</span>
+        <div class="det-sent-content">
+          <p class="det-sentence">${esc(s.sentence)}</p>
+          <div class="det-issues">${issueTags}</div>
+        </div>
+        <button type="button" class="sent-action" data-idx="${s.idx}">Improve sentence</button>`;
       list.appendChild(li);
     });
   }

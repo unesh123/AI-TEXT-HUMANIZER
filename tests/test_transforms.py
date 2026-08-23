@@ -422,6 +422,16 @@ class RewriteTest(unittest.TestCase):
         self.assertIn("technology", out)
         self.assertIn("adaptability", out)
 
+    def test_phrase_simplification_never_duplicates_preposition(self):
+        out, _, changed = rewrite(
+            "The platform offers a plethora of opportunities for greater efficiency.",
+            rng=random.Random(7),
+            intensity=0.8,
+        )
+        self.assertTrue(changed)
+        self.assertNotIn("of of", out.lower())
+        self.assertIn("opportunities", out.lower())
+
     def test_clean_text_is_left_alone(self):
         clean = (
             "I got the new coffee machine set up this morning, and it turns "

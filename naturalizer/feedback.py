@@ -251,9 +251,20 @@ def feedback_humanize(
     """
     text = (text or "").strip()
     if not text:
-        return {"text": "", "passes": 0, "scores": [100], "floor": floor,
-                "method": "none", "llm_used": False, "warning": None,
-                "fact_issues": [], "metrics": {}}
+        return {
+            "text": "",
+            "passes": 0,
+            "scores": [100],
+            "floor": floor,
+            "plain_floor": PLAIN_FLOOR,
+            "method": "none",
+            "llm_used": False,
+            "warning": None,
+            "fact_issues": [],
+            "converged": True,
+            "remaining": {"signals": [], "regions": [], "plain_register": 1.0},
+            "metrics": {},
+        }
 
     profile = get_style(style)
     style = profile["name"]
@@ -344,25 +355,53 @@ def feedback_humanize(
         ):
             break
 
-    # After the loop, re-scan the final text with every configured live
-    # third-party detector (GPTZero / ZeroGPT when their key is present) so
-    # the panel shows real %AI scores for the text the user will see.
-    live_scores = scan_live(current)
+    # Recompute the complete final gate for the payload. A score crossing
+    # the floor alone is not convergence: rhythm, sentence architecture,
+    # passage-level evidence, plain register, and factual preservation must
+    # all be clear before the UI may call the loop complete.
+    final_report = analyze(
+        current,
+        allowlist=profile["allowlist"],
+        keep_structure=profile.get("keep_structure", False),
+    )
+    remaining_signals = _band_weak(final_report.metrics)
+    remaining_regions = _region_weak(current, style)
+    final_plain = plain_register_score(current)
 
     # Honest fact report: any numbers the final text still lost vs. the
     # original (plus negation/entity drift), so the UI can tell the user
     # to double-check figures instead of silently altering them.
     fact_issues = preservation_issues(text, current)
+    high_fact_issues = [i for i in fact_issues if i.get("severity") == "high"]
+    converged = (
+        final_report.score >= floor
+        and not remaining_signals
+        and not remaining_regions
+        and final_plain >= PLAIN_FLOOR
+        and not high_fact_issues
+    )
+
+    # After the loop, re-scan the final text with every configured live
+    # third-party detector (GPTZero / ZeroGPT when their key is present) so
+    # the panel shows real %AI scores for the text the user will see.
+    live_scores = scan_live(current)
 
     return {
         "text": current,
         "passes": passes,
         "scores": scores,
         "floor": floor,
+        "plain_floor": PLAIN_FLOOR,
         "method": method,
         "llm_used": llm_used,
         "warning": warning,
         "fact_issues": fact_issues,
+        "converged": converged,
+        "remaining": {
+            "signals": remaining_signals,
+            "regions": remaining_regions,
+            "plain_register": round(final_plain, 3),
+        },
         "detectors": detector_status(),
         "live_scores": live_scores,
         # Same verified human-writing memory as the single-shot path: how
@@ -371,7 +410,7 @@ def feedback_humanize(
         "metrics": {
             "plain_register": {
                 "before": round(plain_register_score(text), 3),
-                "after": round(plain_register_score(current), 3),
+                "after": round(final_plain, 3),
             },
         },
     }

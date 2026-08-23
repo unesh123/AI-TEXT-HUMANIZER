@@ -68,7 +68,9 @@ WORD_SWAPS = {
     "comprehensive": "thorough",
     "seamless": "smooth",
     "seamlessly": "smoothly",
-    "plethora": "range of",
+    # Keep the following source preposition: “a plethora of opportunities”
+    # becomes “a range of opportunities”, not “a range of of opportunities”.
+    "plethora": "range",
     "myriad": "many",
     "multifaceted": "many-sided",
     "paramount": "essential",
