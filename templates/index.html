@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Naturalizer — humanize AI text into natural human prose and detect AI-written content.">
-<meta name="theme-color" content="#0a0a12">
+<meta name="description" content="Naturalizer — a focused workspace to humanize, verify, and refine your writing.">
+<meta name="theme-color" content="#f7f8fc">
 <title>Naturalizer — AI Humanizer &amp; Detector</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='18' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20260824-premium-white">
 </head>
 <body>
 <div class="app">
@@ -17,27 +20,27 @@
     <div class="brand">
       <span class="brand-logo">N</span>
       <span class="brand-name"><span>Natural</span>izer</span>
-      <button type="button" class="brand-collapse" id="collapse-sidebar" title="Collapse sidebar">◀</button>
+      <button type="button" class="brand-collapse" id="collapse-sidebar" title="Collapse sidebar">‹</button>
     </div>
     <nav class="nav">
       <div class="nav-section">
-        <div class="nav-item"><span class="nav-ico">🏠</span><span class="nav-txt">Home</span></div>
+        <div class="nav-item"><span class="nav-ico" aria-hidden="true">⌂</span><span class="nav-txt">Home</span></div>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Tools</div>
-        <div class="nav-item" id="nav-humanizer"><span class="nav-ico">✍️</span><span class="nav-txt">AI Humanizer</span></div>
-        <div class="nav-item active" id="nav-detector"><span class="nav-ico">🔍</span><span class="nav-txt">AI Detector</span></div>
+        <div class="nav-item" id="nav-humanizer"><span class="nav-ico" aria-hidden="true">✦</span><span class="nav-txt">AI Humanizer</span></div>
+        <div class="nav-item active" id="nav-detector"><span class="nav-ico" aria-hidden="true">◌</span><span class="nav-txt">AI Detector</span></div>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Coming Soon</div>
-        <div class="nav-item disabled"><span class="nav-ico">▶️</span><span class="nav-txt">YouTube Transcript</span></div>
-        <div class="nav-item disabled"><span class="nav-ico">🧠</span><span class="nav-txt">AI Notes Generator</span></div>
-        <div class="nav-item disabled"><span class="nav-ico">🧩</span><span class="nav-txt">Plugins</span></div>
+        <div class="nav-item disabled"><span class="nav-ico" aria-hidden="true">▷</span><span class="nav-txt">YouTube Transcript</span></div>
+        <div class="nav-item disabled"><span class="nav-ico" aria-hidden="true">◈</span><span class="nav-txt">AI Notes Generator</span></div>
+        <div class="nav-item disabled"><span class="nav-ico" aria-hidden="true">⊞</span><span class="nav-txt">Plugins</span></div>
       </div>
     </nav>
     <div class="sidebar-bottom">
       <div class="plan-chip" id="plan-chip">Free</div>
-      <button type="button" class="upgrade" id="upgrade-btn">🚀 Upgrade to Pro</button>
+      <button type="button" class="upgrade" id="upgrade-btn">Upgrade to Pro</button>
       <div class="profile">
         <span class="avatar">U</span>
         <span class="profile-email" id="profile-email">uneshbastola888@gmail.com</span>
@@ -51,12 +54,13 @@
 
     <!-- Hero -->
     <header class="hero">
-      <div class="hero-eyebrow">AI-Powered Writing Tool</div>
-      <h1 class="hero-title">Make Your Text Sound<br><span class="grad">Authentically Human</span></h1>
-      <p class="hero-sub">Paste AI-generated text, import from a URL, or upload a file — then humanize it or detect if it's AI-written.</p>
+      <div class="hero-eyebrow">Writing intelligence</div>
+      <h1 class="hero-title">Make every draft sound<br><span class="grad">authentically yours.</span></h1>
+      <p class="hero-sub">Improve clarity, verify writing signals, and keep every edit under your control.</p>
+      <p class="integrity-note">Local-first writing support · clear results · no authorship guarantees</p>
       <div class="mode-tabs" role="tablist">
-        <button type="button" class="mode-tab" id="tab-humanizer" role="tab">✍️&nbsp; AI Humanizer</button>
-        <button type="button" class="mode-tab active" id="tab-detector" role="tab">🔍&nbsp; AI Detector</button>
+        <button type="button" class="mode-tab" id="tab-humanizer" role="tab">AI Humanizer</button>
+        <button type="button" class="mode-tab active" id="tab-detector" role="tab">AI Detector</button>
       </div>
     </header>
 
@@ -73,17 +77,17 @@
             <!-- URL import -->
             <div class="url-import-wrap" id="url-import-wrap">
               <input type="url" id="url-input" class="url-input" placeholder="Paste a URL to import text…" autocomplete="off">
-              <button type="button" class="ghost small" id="url-import-btn" title="Fetch text from URL">↓ Import</button>
+              <button type="button" class="ghost small" id="url-import-btn" title="Fetch text from URL">Import</button>
             </div>
-            <button type="button" class="icon-btn" id="copy-input" title="Copy input">⧉</button>
-            <button type="button" class="icon-btn" id="clear-input" title="Clear">🗑</button>
+            <button type="button" class="icon-btn" id="copy-input" title="Copy input">Copy</button>
+            <button type="button" class="icon-btn" id="clear-input" title="Clear">Clear</button>
           </div>
         </div>
 
         <!-- Upload zone -->
         <div class="upload" id="upload">
           <input type="file" id="file" accept=".txt,.md,.markdown,.docx,.pdf" hidden>
-          <button type="button" id="pick" class="ghost small">📎 Upload file</button>
+          <button type="button" id="pick" class="ghost small">Upload file</button>
           <span class="upload-note">TXT / MD / DOCX / PDF — or paste a URL above</span>
         </div>
 
@@ -117,16 +121,16 @@
               <select id="style"></select>
               <small id="style-desc"></small>
             </label>
-            <label>Model
+            <label class="local-only-control" hidden>Processing mode
               <select id="provider"></select>
             </label>
             <label>Approach
               <select id="rewrite-mode">
-                <option value="full" selected>Full re-author</option>
-                <option value="standard">Standard rewrite</option>
+                <option value="full" selected>Full rewrite</option>
+                <option value="standard">Balanced rewrite</option>
                 <option value="light">Light edit</option>
               </select>
-              <small>Full re-author rebuilds sentences while preserving facts.</small>
+              <small>Full rewrite improves phrasing while preserving meaning. Review the result before publishing.</small>
             </label>
             <label>Intensity
               <span class="intensity-row">
@@ -135,17 +139,17 @@
               </span>
             </label>
             <div class="settings-checks">
-              <label class="check">
-                <input type="checkbox" id="use-llm" checked>
-                Use LLM
+              <label class="check local-only-control" hidden>
+                <input type="checkbox" id="use-llm">
+                Local processing only
               </label>
-              <label class="check" title="Stream token-by-token">
-                <input type="checkbox" id="stream" checked>
-                Stream live
+              <label class="check local-only-control" hidden>
+                <input type="checkbox" id="stream">
+                Live stream disabled
               </label>
-              <label class="check" title="4-hop translation chain — slowest but most aggressive">
+              <label class="check local-only-control" hidden>
                 <input type="checkbox" id="deep">
-                Deep <small>(translation chain)</small>
+                Extended rewrite disabled
               </label>
             </div>
           </div>
@@ -155,14 +159,14 @@
         <div class="action-row" id="action-row">
           <div class="action-primary">
             <!-- Detector mode: single button -->
-            <button type="button" class="primary action-detect" id="run">🔍 Detect AI</button>
+            <button type="button" class="primary action-detect" id="run">Detect AI</button>
             <!-- Humanizer mode: two buttons -->
-            <button type="button" class="primary action-humanize" id="run-humanize" hidden>✍️ Humanize</button>
-            <button type="button" class="ghost small" id="vary-btn" hidden title="Run again, different words">↻ Vary</button>
-            <button type="button" class="ghost small action-cancel" id="cancel-humanize" hidden>✕ Cancel</button>
+            <button type="button" class="primary action-humanize" id="run-humanize" hidden>Humanize text</button>
+            <button type="button" class="ghost small" id="vary-btn" hidden title="Run again, different words">Vary</button>
+            <button type="button" class="ghost small action-cancel" id="cancel-humanize" hidden>Cancel</button>
           </div>
           <div class="action-secondary">
-            <button type="button" class="ghost small action-detect" id="run-detect-in-humanizer" hidden title="Detect AI on this text">🔍 Detect</button>
+            <button type="button" class="ghost small action-detect" id="run-detect-in-humanizer" hidden title="Detect AI on this text">Detect</button>
           </div>
         </div>
 
@@ -176,18 +180,16 @@
           <h2 id="result-card-title">Result</h2>
           <div class="card-head-actions">
             <!-- Primary result actions - always visible -->
-            <button type="button" class="ghost small" id="share-btn" title="Copy result to clipboard">⧉ Copy</button>
-            <button type="button" class="ghost small" id="again-btn" title="Humanize again with different words" hidden>↻ Again</button>
+            <button type="button" class="ghost small" id="share-btn" title="Copy result to clipboard">Copy</button>
+            <button type="button" class="ghost small" id="again-btn" title="Humanize again with different words" hidden>Again</button>
             <!-- More menu trigger -->
             <div class="more-menu-wrap">
-              <button type="button" class="ghost small" id="more-btn" title="More actions">⋯ More</button>
+              <button type="button" class="ghost small" id="more-btn" title="More actions">More</button>
               <div class="more-menu" id="more-menu" hidden>
-                <button type="button" class="more-item" id="perfect-btn">⚡ Perfect humanize</button>
-                <button type="button" class="more-item" id="compare-btn">⚖ Compare providers</button>
-                <button type="button" class="more-item" id="bench-btn">📊 Accuracy stats</button>
-                <button type="button" class="more-item" id="history-btn">🕘 History</button>
-                <button type="button" class="more-item" id="detectors-btn">🔌 Detector status</button>
-                <button type="button" class="more-item" id="download-pdf">↓ Download PDF</button>
+                <button type="button" class="more-item" id="bench-btn">Local quality stats</button>
+                <button type="button" class="more-item" id="history-btn">History</button>
+                <button type="button" class="more-item" id="detectors-btn">Local detector status</button>
+                <button type="button" class="more-item" id="download-pdf">Download PDF</button>
               </div>
             </div>
           </div>
@@ -299,7 +301,7 @@
           <div class="output-block">
             <div class="output-head">
               <span class="output-label">Rewritten text <small id="llm-note"></small></span>
-              <button type="button" class="copy-output-btn" id="copy-output-btn" title="Copy rewritten text">⧉ Copy result</button>
+              <button type="button" class="copy-output-btn" id="copy-output-btn" title="Copy rewritten text">Copy result</button>
             </div>
             <p id="llm-warn" class="llm-warn" hidden></p>
             <p id="plan-note" class="llm-warn" hidden></p>
@@ -308,7 +310,7 @@
 
           <!-- Collapsible diff -->
           <details class="diff-details">
-            <summary>📄 Show before / after diff</summary>
+            <summary>Show before / after diff</summary>
             <div class="compare-grid">
               <div class="compare-col">
                 <h4>Before</h4>
@@ -343,7 +345,7 @@
       <h3>Batch mode</h3>
       <p class="hint">Paste one document per blank line. Each becomes its own result.</p>
       <textarea id="batch-input" rows="6" placeholder="Document one&#10;&#10;Document two&#10;&#10;Document three"></textarea>
-      <button id="run-batch" class="primary" style="margin-top:10px">Naturalize batch</button>
+      <button id="run-batch" class="primary" style="margin-top:10px">Humanize batch</button>
       <div id="batch-out"></div>
 
       <h3 style="margin-top:28px">Plagiarism / similarity check</h3>
@@ -366,20 +368,20 @@
 <!-- Plan modal -->
 <div class="modal-backdrop" id="plan-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
-    <h3 id="plan-modal-title">🚀 Naturalizer Plans</h3>
+    <h3 id="plan-modal-title">Naturalizer Plans</h3>
     <p class="sub">Start free with the detector and deterministic humanizer. Go Pro for the full rewriting engine.</p>
     <table>
       <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
       <tr><td>AI detector + naturalness score</td><td class="yes">✓</td><td class="yes">✓</td></tr>
       <tr><td>Deterministic humanizer</td><td class="yes">✓ 1,000 words/day</td><td class="yes">✓ unlimited</td></tr>
-      <tr><td>LLM rewrite (Claude / CX / OpenAI / Gemini…)</td><td class="no">—</td><td class="yes">✓</td></tr>
-      <tr><td>Perfect humanize — live feedback loop</td><td class="no">—</td><td class="yes">✓</td></tr>
-      <tr><td>Deep humanize — 4-hop translation chain</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Local rewrite engine</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Reviewable quality notes</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>External detector evasion or guarantees</td><td class="no">—</td><td class="no">—</td></tr>
       <tr><td>Batch mode</td><td class="no">—</td><td class="yes">✓</td></tr>
       <tr><td>Full rewrite + intensity + variety</td><td class="no">—</td><td class="yes">✓</td></tr>
       <tr><td>Sentence-level re-humanize</td><td class="yes">✓</td><td class="yes">✓</td></tr>
       <tr><td>Plagiarism / similarity check</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td>URL import (scrape & humanize)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>URL text import (local processing)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
     </table>
     <p class="modal-note" id="plan-modal-note"></p>
     <div class="modal-actions">
@@ -389,7 +391,7 @@
 </div>
 
 <footer class="wrap">
-  <p>Deterministic core — no API key required. Add Claude (<code>HINAA_CLAUDE_API_KEY</code>) or CX gateway (<code>CX_GATEWAY_API_KEY</code>) in <code>.env.local</code> to enable LLM rewrites.</p>
+  <p>Naturalizer keeps your writing in focus. Processing is local-first, edits are reviewable, and detector scores are writing signals rather than proof of authorship.</p>
 </footer>
 
 <script nonce="__CSP_NONCE__">
@@ -528,7 +530,7 @@ async function importUrl() {
     showError(requestFailed(e) ? SERVER_DOWN_MSG : "Import failed: " + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "↓ Import";
+    btn.textContent = "Import";
   }
 }
 
@@ -574,7 +576,7 @@ async function init() {
     badge.classList.add("badge-on");
     badge.hidden = false;
   } else {
-    badge.textContent = "LLM not configured — deterministic mode";
+    badge.textContent = "Local processing · no external model";
     badge.hidden = false;
   }
   if (status.uploads && status.uploads.max_bytes) {
@@ -642,7 +644,7 @@ function wireTabs() {
       if (navigator.clipboard) {
         navigator.clipboard.writeText(text);
         copyOutBtn.textContent = "✓ Copied!";
-        setTimeout(() => { copyOutBtn.textContent = "⧉ Copy result"; }, 1600);
+        setTimeout(() => { copyOutBtn.textContent = "Copy result"; }, 1600);
       }
     });
   }
@@ -674,8 +676,6 @@ function wireTabs() {
   $("again-btn").addEventListener("click", humanizeAgain);
   $("bench-btn").addEventListener("click", runBench);
   $("history-btn").addEventListener("click", runHistory);
-  $("perfect-btn").addEventListener("click", runPerfect);
-  $("compare-btn").addEventListener("click", runCompare);
   $("detectors-btn").addEventListener("click", runDetectors);
   $("upgrade-btn").addEventListener("click", openPlanModal);
   $("plan-close").addEventListener("click", closePlanModal);
@@ -691,7 +691,7 @@ function wireTabs() {
     syncSettingsHint();
   });
   $("cancel-humanize").addEventListener("click", cancelHumanizeRequest);
-  // Sentence-level re-humanize: "↻ humanize" on a flagged sentence.
+  // Sentence-level re-humanize action on a flagged sentence.
   $("det-sentences").addEventListener("click", onSentenceAction);
 }
 
@@ -748,9 +748,9 @@ function startSteps() {
   let i = 0;
   setStep(0);
   const tick = () => {
-    if (i < 2) { i += 1; setStep(i); stepTimer = setTimeout(tick, 420); }
+    if (i < 2) { i += 1; setStep(i); stepTimer = setTimeout(tick, 220); }
   };
-  stepTimer = setTimeout(tick, 420);
+  stepTimer = setTimeout(tick, 220);
 }
 
 function finishSteps() {
@@ -760,17 +760,18 @@ function finishSteps() {
     s.classList.remove("active");
     s.classList.add("done");
   });
-  setTimeout(() => { box.hidden = true; }, 800);
+  setTimeout(() => { box.hidden = true; }, 360);
 }
 
 function typeInto(el, finalHtml, plainText) {
   const words = (plainText || "").split(/\s+/).filter(Boolean);
   if (!words.length) { el.innerHTML = finalHtml; return; }
-  const interval = Math.max(6, Math.min(24, 9000 / words.length));
+  const chunkSize = Math.max(1, Math.ceil(words.length / 180));
+  const interval = 10;
   el.classList.add("typing-caret");
   let i = 0;
   const tick = () => {
-    i += 1;
+    i = Math.min(words.length, i + chunkSize);
     el.textContent = words.slice(0, i).join(" ");
     if (i < words.length) {
       setTimeout(tick, interval);
@@ -855,7 +856,7 @@ async function onSentenceAction(e) {
     if (!res.ok) {
       showError(data.error || "Re-humanize failed");
       btn.disabled = false;
-      btn.textContent = "↻ humanize";
+      btn.textContent = "Improve sentence";
       return;
     }
     const rewritten = data.llm_used ? (data.llm_rewritten || data.rewritten) : data.rewritten;
@@ -863,7 +864,7 @@ async function onSentenceAction(e) {
   } catch (err) {
     showError("Re-humanize failed: " + err.message);
     btn.disabled = false;
-    btn.textContent = "↻ humanize";
+    btn.textContent = "Improve sentence";
   }
 }
 
@@ -910,7 +911,7 @@ async function runBench() {
     showError(requestFailed(e) ? SERVER_DOWN_MSG : "Benchmark failed: " + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "📊 Accuracy";
+    btn.textContent = "Accuracy";
   }
 }
 
@@ -948,7 +949,7 @@ async function runPerfect() {
     showError(requestFailed(e) ? SERVER_DOWN_MSG : "Perfect humanize failed: " + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "⚡ Perfect humanize";
+    btn.textContent = "Perfect humanize";
   }
 }
 
@@ -980,7 +981,7 @@ function renderPerfect(p, originalText) {
   const detectors = (p.detectors || []).map((d) => detRow(d, liveScores)).join("");
   out.innerHTML = `
     <div class="bench">
-      <h3>⚡ Perfect humanize <small>live feedback loop</small></h3>
+      <h3>Perfect humanize <small>live feedback loop</small></h3>
       <div class="perfect-trail">
         <span class="pass-cap">naturalness per pass</span>
         <div class="pass-scores">${trail}</div>
@@ -997,7 +998,7 @@ function renderPerfect(p, originalText) {
       </div>
       <h4 class="det-head">Detector coverage</h4>
       <div class="det-grid">${detectors}</div>
-      <p class="bench-note">This is a local writing-quality loop, not a proof of human authorship or a guarantee of any external detector’s result. Review factual details and citations before publishing. Add permitted third-party detector keys to <code>.env.local</code> to compare live scores.</p>
+      <p class="bench-note">This is local writing-quality feedback, not proof of authorship or a promise about any external service. Review factual details, citations, and your institution’s rules before publishing.</p>
       <div class="perfect-actions">
         <button type="button" class="ghost small" id="perfect-use-input">Use as new draft</button>
         <button type="button" class="ghost small" id="perfect-copy">Copy rewrite</button>
@@ -1075,7 +1076,7 @@ async function runCompare() {
     showError(requestFailed(e) ? SERVER_DOWN_MSG : "Compare failed: " + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "⚖ Compare";
+    btn.textContent = "Compare";
   }
 }
 
@@ -1114,10 +1115,10 @@ function renderCompare(data) {
   ).join("");
   out.innerHTML = `
     <div class="bench">
-      <h3>⚖ Compare <small>every humanizer, one input</small></h3>
+      <h3>Compare <small>every humanizer, one input</small></h3>
       ${rows ? `<div class="cmp-list">${rows}</div>` : '<p class="cmp-empty">No candidates produced output.</p>'}
       ${blocked ? `<h4 class="det-head">Not available this run</h4><div class="det-grid">${blocked}</div>` : ""}
-      <p class="bench-note">The same input is run through every configured humanizer and ranked by the shared floor gate: highest naturalness that clears the floor, then plainest register, then fewest lost facts. Add <code>STEALTHGPT_API_KEY</code> / <code>UNDETECTABLE_API_KEY</code> to <code>.env.local</code> to include those live. Click <b>Use</b> to load a version into the After pane.</p>
+      <p class="bench-note">Local rewrite approaches are ranked by explainable quality signals and factual preservation. No external provider output is used.</p>
     </div>`;
   out.hidden = false;
   out.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1178,11 +1179,10 @@ async function runDetectors() {
     const data = await res.json();
     if (!res.ok) { showError(data.error || "Detectors check failed"); return; }
     const dets = data.detectors || [];
-    // Live-scan the current input with every configured third-party
-    // detector, so the panel shows real GPTZero / ZeroGPT scores.
+    // The local detector is the only detector exposed by Naturalizer.
     let liveScores = null;
     const text = ($("input") || {}).value || "";
-    if (text.trim() && dets.some((d) => d.live && d.configured)) {
+    if (text.trim() && dets.some((d) => d.name !== "local" && d.live && d.configured)) {
       const scanRes = await fetch("/api/detectors/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1197,9 +1197,9 @@ async function runDetectors() {
     const rows = dets.map((d) => detRow(d, liveScores)).join("");
     out.innerHTML = `
       <div class="bench">
-        <h3>🔌 Detector status</h3>
+        <h3>Detector status</h3>
         <div class="det-grid">${rows}</div>
-        <p class="bench-note">The built-in detector is always live. GPTZero and ZeroGPT light up <b>live</b> when their API key is in <code>.env.local</code> — their %AI score for the current text appears here. Originality.ai needs its paid API; Turnitin has no developer API.</p>
+        <p class="bench-note">The local detector is always available and reports explainable writing signals. It does not connect to external detector services or establish authorship.</p>
       </div>`;
     out.hidden = false;
     out.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1228,12 +1228,12 @@ async function runHistory() {
     const entries = data.entries || [];
     historyCache = entries;
     if (!entries.length) {
-      out.innerHTML = `<div class="bench"><h3>🕘 History</h3><p class="bench-note">No saved runs yet — every Naturalize / ⚡ Perfect run is saved here with its input, rewrite and score.</p></div>`;
+      out.innerHTML = `<div class="bench"><h3>History</h3><p class="bench-note">No saved runs yet — every Naturalize / Perfect run is saved here with its input, rewrite and score.</p></div>`;
     } else {
       out.innerHTML = `
         <div class="bench">
           <div class="history-head">
-            <h3>🕘 History <small>${entries.length} saved</small></h3>
+            <h3>History <small>${entries.length} saved</small></h3>
             <button type="button" class="ghost small" id="history-clear">Clear all</button>
           </div>
           <div class="history-list">${entries.map(historyRow).join("")}</div>
@@ -1251,7 +1251,7 @@ async function runHistory() {
 
 function historyRow(e) {
   const styleLabel = (e.style || "academic").replace(/^./, (c) => c.toUpperCase());
-  const modeTag = e.mode === "perfect" ? "⚡ perfect" : (e.mode === "batch" ? "batch" : "naturalize");
+  const modeTag = e.mode === "perfect" ? "perfect" : (e.mode === "batch" ? "batch" : "naturalize");
   const raw = e.input || "";
   const flat = raw.replace(/\s+/g, " ").trim();
   const snippet = flat.slice(0, 90) + (flat.length > 90 ? "…" : "");
@@ -1387,7 +1387,7 @@ function renderDetector(d) {
   list.innerHTML = "";
   const flagged = d.sentences.filter((s) => s.label !== "human");
   if (!flagged.length) {
-    list.innerHTML = `<li class="det-none"><div class="det-empty-art">📄✓</div><span>No AI-generated sentences detected.</span></li>`;
+    list.innerHTML = `<li class="det-none"><div class="det-empty-art">✓</div><span>No AI-generated sentences detected.</span></li>`;
   } else {
     flagged.forEach((s) => {
       const li = document.createElement("li");
@@ -1493,7 +1493,7 @@ function renderMetrics(r) {
     cell.className = "metric metric-comparison reveal-up";
     cell.innerHTML = `
       <div class="metric-head"><strong>Detector comparison</strong><span class="metric-delta ${dc.after.verdict === "human" ? "up" : "down"}">${esc(String(dc.before.verdict))} → ${esc(String(dc.after.verdict))}</span></div>
-      <div class="metric-desc">same local heuristic before and after; not a third-party detector guarantee</div>
+      <div class="metric-desc">same local heuristic before and after; not proof of authorship</div>
       <div class="comparison-row"><span>before</span><div class="track"><div class="fill" style="width:${beforeScore}%"></div></div><b>${Math.round(beforeScore)}</b></div>
       <div class="comparison-row"><span>after</span><div class="track"><div class="fill fill-after" style="width:${afterScore}%"></div></div><b>${Math.round(afterScore)}</b></div>`;
     grid.appendChild(cell);
@@ -1550,7 +1550,7 @@ function renderMetrics(r) {
   const afterScore = m.after_score;
   $("metrics-note").textContent = afterScore === undefined || afterScore === null
     ? ""
-    : `Post-rewrite re-scan: the output scores ${afterScore}/100 on the same local signals (verification of the shown rewrite — not a third-party detector).`;
+    : `Post-rewrite re-scan: the output scores ${afterScore}/100 on the same local signals (verification of the shown rewrite — not proof of authorship).`;
   box.hidden = false;
 }
 
@@ -1675,8 +1675,8 @@ function renderResult(r, opts) {
   }
   $("llm-note").textContent = r.llm_used
     ? (r.llm_method === "chain"
-        ? `translation chain · ${r.llm_provider || "auto"} · EN→中文→日本語→suomi→EN`
-        : `higher quality (${r.llm_provider || "LLM"})`)
+        ? `local rewrite · ${r.llm_provider || "Naturalizer"}`
+        : `local rewrite · ${r.llm_provider || "Naturalizer"}`)
       + (resultMetrics.rewrite_mode ? ` · ${resultMetrics.rewrite_mode} approach` : "")
     : "";
   const llmWarn = $("llm-warn");
@@ -1732,7 +1732,7 @@ async function runOne() {
   } finally {
     endHumanizeRequest(controller);
     btn.disabled = false;
-    btn.textContent = "Naturalize";
+    btn.textContent = "Humanize text";
   }
 }
 
@@ -1742,7 +1742,7 @@ async function runOneStream(payload) {
   const controller = new AbortController();
   beginHumanizeRequest(controller);
   btn.disabled = true;
-  btn.textContent = "Streaming…";
+  btn.textContent = "Generating…";
   startSteps();
   const after = $("after");
   after.textContent = "";
@@ -1866,7 +1866,7 @@ async function runOneStream(payload) {
     if (watchdog) clearInterval(watchdog);
     endHumanizeRequest(controller);
     btn.disabled = false;
-    btn.textContent = "Naturalize";
+    btn.textContent = "Humanize text";
   }
 }
 
@@ -1912,7 +1912,7 @@ async function runBatch() {
     showError(requestFailed(e) ? SERVER_DOWN_MSG : "Request failed: " + e.message);
   } finally {
     $("run-batch").disabled = false;
-    $("run-batch").textContent = "Naturalize batch";
+    $("run-batch").textContent = "Humanize batch";
   }
 }
 
@@ -2074,18 +2074,20 @@ $("run").addEventListener("click", () => { if (mode === "detector") runDetect();
 $("run-humanize").addEventListener("click", runOne);
 $("run-batch").addEventListener("click", runBatch);
 $("run-plag").addEventListener("click", runPlag);
-// Subtle depth motion for pointer users; disabled for touch and reduced-motion preferences.
+document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
+    if (mode === "detector") runDetect();
+    else runOne();
+  }
+});
+// Restrained hover depth for pointer users; no transform tilt on content cards.
 (function addDepthMotion() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   if (window.matchMedia("(pointer: coarse)").matches) return;
-  document.querySelectorAll(".card, .hero").forEach((el) => {
-    el.addEventListener("pointermove", (ev) => {
-      const r = el.getBoundingClientRect();
-      const x = (ev.clientX - r.left) / r.width - 0.5;
-      const y = (ev.clientY - r.top) / r.height - 0.5;
-      el.style.transform = `perspective(900px) rotateX(${(-y * 1.8).toFixed(2)}deg) rotateY(${(x * 2.2).toFixed(2)}deg) translateY(-2px)`;
-    });
-    el.addEventListener("pointerleave", () => { el.style.transform = ""; });
+  document.querySelectorAll(".card").forEach((el) => {
+    el.addEventListener("pointerenter", () => el.classList.add("is-hovered"));
+    el.addEventListener("pointerleave", () => el.classList.remove("is-hovered"));
   });
 })();
 init();

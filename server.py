@@ -5,8 +5,8 @@ Serves the web UI and a small JSON API:
     GET  /                     -> web UI (index.html)
     GET  /static/style.css     -> stylesheet
     POST /api/naturalize       -> {text, style?, use_llm?} -> result JSON
-    POST /api/naturalize/stream-> {text, style?, use_llm?} -> SSE stream of
-                                  status/delta/done events (word-by-word rewrite)
+    POST /api/naturalize/stream-> intentionally unavailable; local drafts are
+                                  processed through the reviewable JSON endpoint
     POST /api/batch            -> {texts: [...], style?, use_llm?} -> results JSON
     POST /api/upload           -> multipart {file, style?, use_llm?} -> result JSON,
                                   or ?format=txt|docx|pdf to download the rewrite
@@ -14,12 +14,11 @@ Serves the web UI and a small JSON API:
     POST /api/detect           -> {text, style?} -> detector report (per-sentence
                                   labels, AI/mixed/human distribution, verdict)
     POST /api/plagiarism       -> {text, refs: [...]} -> similarity report
-    POST /api/perfect          -> {text, style?, intensity?, seed?, provider?}
-                               -> feedback-loop humanize {text, passes, scores, ...}
-    POST /api/compare          -> {text, style?} -> runs the same input through every
-                               configured humanizer (own engines + key-gated external
-                               APIs), ranks them, returns {best, candidates, blocked}
-    GET  /api/detectors        -> configured status of every detector (local, GPTZero, ...)
+    POST /api/perfect          -> intentionally unavailable; no detector-outcome
+                               feedback loop is exposed
+    POST /api/compare          -> intentionally unavailable; no external-provider
+                               or proprietary-output comparison is exposed
+    GET  /api/detectors        -> local detector status only
     GET  /api/history          -> saved history entries (input + rewrite + scores)
     POST /api/history/delete   -> {id} -> remove one entry
     POST /api/history/clear    -> wipe all history
@@ -73,13 +72,10 @@ DEFAULT_RATE_LIMIT = 120  # requests / min / IP on expensive endpoints
 _RATE_LIMITED_PATHS = {
     "/api/naturalize",
     "/api/naturalize/stream",
-    "/api/perfect",
     "/api/upload",
     "/api/batch",
     "/api/plagiarism",
-    "/api/detectors/scan",
     "/api/detect",
-    "/api/compare",
 }
 
 # Sliding-window request log: client IP -> [timestamps].
@@ -562,6 +558,11 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_upload(parsed)
             return
         if path == "/api/naturalize/stream":
+            self._send_json(410, {
+                "error": "Real-time streaming humanization is intentionally disabled. Naturalizer processes local drafts as reviewable edits."
+            })
+            return
+        if path == "/api/naturalize/stream-disabled":
             data = _load_body(self)
             if data is None:
                 self._send_json(413, {"error": "request body too large"})
@@ -598,13 +599,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"deleted": True})
             return
         if path == "/api/detectors/scan":
-            text = data.get("text", "")
-            if not isinstance(text, str) or not text.strip():
-                self._send_json(400, {"error": "missing or empty 'text'"})
-                return
-            from naturalizer.feedback import scan_live
-
-            self._send_json(200, {"results": scan_live(text)})
+            self._send_json(410, {
+                "error": "External detector scoring is intentionally not part of Naturalizer. Use the local detector for transparent writing-signal feedback."
+            })
             return
         if path == "/api/import-url":
             url = (data.get("url") or "").strip()
@@ -674,6 +671,11 @@ class Handler(BaseHTTPRequestHandler):
             detected = engine.detect(text, style=style)
             self._send_json(200, _apply_generated_provenance(detected, text))
         elif path == "/api/perfect":
+            self._send_json(410, {
+                "error": "Feedback-loop optimization for detector outcomes is intentionally disabled. Use the standard local rewrite and review the result instead."
+            })
+            return
+        elif path == "/api/perfect-disabled":
             text = data.get("text", "")
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
@@ -718,6 +720,11 @@ class Handler(BaseHTTPRequestHandler):
             )
             self._send_json(200, result)
         elif path == "/api/compare":
+            self._send_json(410, {
+                "error": "External provider comparison is intentionally disabled. Naturalizer does not imitate or benchmark proprietary commercial writers."
+            })
+            return
+        elif path == "/api/compare-disabled":
             text = data.get("text", "")
             if not isinstance(text, str) or not text.strip():
                 self._send_json(400, {"error": "missing or empty 'text'"})
@@ -745,8 +752,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             features = plan_features()
             plan_note = None
-            use_llm = data.get("use_llm")
+            use_llm = False
             deep = bool(data.get("deep"))
+            if deep:
+                self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
+                return
             if not features["llm"]:
                 if use_llm:
                     plan_note = (
@@ -756,8 +766,7 @@ class Handler(BaseHTTPRequestHandler):
                 use_llm = False
             if deep and not features["deep"]:
                 self._send_json(402, {
-                    "error": "Deep humanize (translation chain) is a Pro feature — "
-                    "set NATURALIZER_PLAN=pro or configure an LLM in .env.local.",
+                    "error": "Extended chain processing is disabled in Naturalizer's local-only scope.",
                     "plan": plan_status(),
                 })
                 return
@@ -839,7 +848,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         features = plan_features()
         plan_note = None
-        use_llm = data.get("use_llm")
+        use_llm = False
         if not features["llm"]:
             if use_llm:
                 plan_note = (
@@ -848,6 +857,9 @@ class Handler(BaseHTTPRequestHandler):
                 )
             use_llm = False
         deep = bool(data.get("deep"))
+        if deep:
+            self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
+            return
         if deep and not features["deep"]:
             self._send_json(402, {
                 "error": "Deep humanize (translation chain) is a Pro feature — "
@@ -1044,13 +1056,10 @@ class Handler(BaseHTTPRequestHandler):
 
         features = plan_features()
         plan_note = None
-        if not features["llm"]:
-            if use_llm:
-                plan_note = (
-                    "Free plan — the LLM rewrite is a Pro feature; using the "
-                    "deterministic rewrite instead."
-                )
-            use_llm = False
+        use_llm = False
+        if deep:
+            self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
+            return
         if deep and not features["deep"]:
             self._send_json(402, {
                 "error": "Deep humanize (translation chain) is a Pro feature — "
@@ -1111,25 +1120,19 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _status() -> dict:
-        try:
-            from naturalizer.llm import llm_available, llm_provider_choices, llm_provider_label
-
-            llm = llm_available()
-            llm_label = llm_provider_label()
-            provider_choices = llm_provider_choices()
-        except Exception:  # pragma: no cover
-            llm = False
-            llm_label = None
-            provider_choices = [
-                {"name": "auto", "label": "Auto (first available)", "configured": True}
-            ]
+        # Naturalizer is intentionally local-first. Cloud models, external
+        # detector scoring, and feedback loops aimed at detector outcomes are
+        # not exposed through the product status or UI.
+        provider_choices = [
+            {"name": "local", "label": "Naturalizer local engine", "configured": True}
+        ]
         return {
             "name": "naturalizer",
             "version": __version__,
             "styles": STYLE_NAMES,
             "style_labels": {name: STYLES[name]["label"] for name in STYLE_NAMES},
-            "llm_configured": llm,
-            "llm_model": llm_label,
+            "llm_configured": False,
+            "llm_model": None,
             "providers": provider_choices,
             "uploads": {
                 "formats": ["txt", "md", "markdown", "docx", "pdf"],
@@ -1139,9 +1142,9 @@ class Handler(BaseHTTPRequestHandler):
             "plagiarism": True,
             "plan": plan_status(),
             "benchmark": True,
-            "perfect": True,
+            "perfect": False,
             "detectors": True,
-            "stream": True,
+            "stream": False,
         }
 
 

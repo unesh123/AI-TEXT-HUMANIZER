@@ -3,7 +3,7 @@
 Compares a document against reference texts the user supplies using word
 n-gram *containment*: how much of the query's word sequences also appear in
 a reference. This catches verbatim and near-verbatim copying, which is what
-a real Turnitin-style flag usually looks like.
+a local reference-overlap flag usually looks like.
 
 Honest limits (surfaced in the UI and in :func:`check`'s note):
 

@@ -1,18 +1,16 @@
 """Free / Pro plan structure with daily word-cap accounting.
 
-The product roadmap starts at a free tier and gates the expensive paths
-behind Pro:
+Naturalizer uses a local-only plan model:
 
-* **Free** — deterministic humanizer + AI detector, plagiarism check,
-  document upload (capped words/day). No LLM rewrite, no deep translation
-  chain, no batch mode, no high-intensity variety.
-* **Pro** — everything: LLM rewrite (Claude / CX gateway), the 4-hop
-  translation chain, batch mode, full intensity range, sentence-level
-  re-humanize.
+* **Free** — deterministic humanizer + local AI detector, reference-overlap
+  check, document upload, and reviewable before/after output.
+* **Pro** — the same local capabilities with a higher local word allowance,
+  batch mode, full intensity range, and sentence-level re-humanize.
 
-Plan resolution: ``NATURALIZER_PLAN`` env var wins; otherwise the plan is
-``pro`` when any LLM provider is configured (the tool is yours to run) and
-``free`` otherwise. To demo the free experience::
+Cloud LLMs, external detector scoring, feedback loops aimed at detector
+outcomes, and multi-language translation chains are deliberately out of scope.
+Plan resolution: ``NATURALIZER_PLAN`` env var wins; otherwise the plan stays
+``free``. To demo the free experience::
 
     NATURALIZER_PLAN=free python server.py
 
@@ -49,10 +47,10 @@ PLANS: Dict[str, Dict] = {
     "pro": {
         "label": "Pro",
         "features": {
-            "llm": True,
-            "deep": True,
+            "llm": False,
+            "deep": False,
             "batch": True,
-            "perfect": True,
+            "perfect": False,
             "sentence_rehumanize": True,
             "plagiarism": True,
             "upload": True,
@@ -98,18 +96,9 @@ def _today() -> str:
 
 
 def current_plan() -> str:
-    """Resolve the active plan: env override, else pro-if-LLM / free."""
+    """Resolve the active local plan from the explicit environment override."""
     value = (os.environ.get("NATURALIZER_PLAN") or "").strip().lower()
-    if value in PLANS:
-        return value
-    try:
-        from .llm import llm_available
-
-        if llm_available():
-            return "pro"
-    except Exception:  # pragma: no cover - defensive
-        pass
-    return "free"
+    return value if value in PLANS else "free"
 
 
 def plan_features(plan: Optional[str] = None) -> Dict:
@@ -160,7 +149,7 @@ def check_word_quota(words: int) -> Tuple[bool, Optional[str]]:
         return False, (
             f"Free plan daily limit reached — {remaining} of "
             f"{FREE_WORDS_PER_DAY} words left today. Set NATURALIZER_PLAN=pro "
-            "or restart with a configured LLM to unlock unlimited words."
+            "to unlock the local Pro allowance."
         )
     return True, None
 
@@ -175,5 +164,5 @@ def status() -> Dict:
         "features": features,
         "words_used_today": words_used_today(),
         "words_remaining_today": usage_remaining(),
-        "upgrade_hint": "Set NATURALIZER_PLAN=pro (or configure an LLM in .env.local) to unlock Pro features.",
+        "upgrade_hint": "Set NATURALIZER_PLAN=pro to unlock the local Pro allowance and batch tools.",
     }
