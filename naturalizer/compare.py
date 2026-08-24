@@ -3,7 +3,7 @@
 This module compares approved local rewrite approaches only. It does not call
 external humanizers, scrape competitor products, reverse-engineer private
 systems, or optimize text against third-party detector outcomes. The HTTP
-comparison route is disabled; these helpers remain for local experiments and
+comparison route is retired; these helpers remain for local experiments and
 backward-compatible imports.
 """
 

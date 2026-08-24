@@ -1,8 +1,8 @@
 """Command-line document naturalizer (pure stdlib).
 
 Runs the same upload pipeline as the web UI from the terminal: extract text
-from a TXT/DOCX/PDF file, naturalize it, and write the rewritten file back
-out in your choice of format.
+from a TXT/DOCX/PDF file, naturalize it with the local deterministic
+engine, and write the rewritten file back out in your choice of format.
 
     python -m naturalizer.cli draft.docx                     # -> draft-naturalized.docx
     python -m naturalizer.cli draft.pdf -f txt               # -> draft-naturalized.txt
@@ -52,19 +52,7 @@ def _parse(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="output format (defaults to the input's format)",
     )
     parser.add_argument("--style", default="academic", help="style profile (default: academic)")
-    parser.add_argument("--no-llm", action="store_true", help="never use the LLM backend")
-    parser.add_argument(
-        "--deep",
-        action="store_true",
-        help="use the 4-hop translation chain (EN->中文->日本語->suomi->EN) for maximum humanization",
-    )
-    parser.add_argument(
-        "--provider",
-        choices=["auto", "claude", "cx", "openai", "gemini", "qwen", "router", "codex", "hcns"],
-        default="auto",
-        help="LLM provider for the rewrite: auto (first configured), or a specific provider "
-        "(claude | cx | openai | gemini | qwen | router | codex | hcns) (default: auto)",
-    )
+    parser.add_argument("--no-llm", action="store_true", help="accepted for compatibility; the local engine is always used")
     parser.add_argument("--overwrite", action="store_true", help="overwrite existing output files")
     parser.add_argument("--json", action="store_true", help="print the full result as JSON on stdout")
     return parser.parse_args(argv)
@@ -78,9 +66,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
 
     engine = Naturalizer(seed=0)
-    use_llm = False if args.no_llm else None
+    use_llm = False  # local deterministic engine only
     ok = True
-    deep = args.deep
 
     for input_path in args.inputs:
         try:
@@ -111,7 +98,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             continue
 
         result = engine.naturalize(
-            original, style=args.style, use_llm=use_llm, deep=deep, provider=args.provider
+            original, style=args.style, use_llm=use_llm
         )
         rewritten = result.llm_rewritten if result.llm_used else result.rewritten
         out_path.write_bytes(to_bytes(rewritten, fmt))
@@ -137,9 +124,4 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    # Only the real CLI entry point pulls credentials from .env.local / .env,
-    # so in-process callers (e.g. tests) stay hermetic and deterministic.
-    from .envfile import load_envfile
-
-    load_envfile()
     sys.exit(main())
