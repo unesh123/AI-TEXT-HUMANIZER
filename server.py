@@ -400,11 +400,14 @@ class Handler(BaseHTTPRequestHandler):
     def _send_index(self) -> None:
         """Serve the HTML shell with a per-request CSP nonce on the inline script."""
         nonce = secrets.token_hex(16)
-        body = INDEX_HTML.replace("__CSP_NONCE__", nonce).encode("utf-8")
+        html_src = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+        body = html_src.replace("__CSP_NONCE__", nonce).encode("utf-8")
         headers = _security_headers()
         headers["Content-Type"] = "text/html; charset=utf-8"
         headers["Content-Length"] = str(len(body))
-        headers["Cache-Control"] = "no-cache"
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        headers["Pragma"] = "no-cache"
+        headers["Expires"] = "0"
         headers["Content-Security-Policy"] = _csp_policy(nonce)
         self._send_headers(200, headers)
         self.wfile.write(body)
@@ -414,17 +417,20 @@ class Handler(BaseHTTPRequestHandler):
         headers = self._common_headers()
         headers["Content-Type"] = ctype
         headers["Content-Length"] = str(len(body))
-        headers["Cache-Control"] = "no-cache"
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         self._send_headers(status, headers)
         self.wfile.write(body)
 
-    def _send_css(self, body: bytes) -> None:
+    def _send_css(self, body: bytes = b"") -> None:
+        css_text = (ROOT / "static" / "style.css").read_text(encoding="utf-8").encode("utf-8")
         headers = self._common_headers()
         headers["Content-Type"] = "text/css; charset=utf-8"
-        headers["Content-Length"] = str(len(body))
-        headers["Cache-Control"] = "public, max-age=86400"
+        headers["Content-Length"] = str(len(css_text))
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        headers["Pragma"] = "no-cache"
+        headers["Expires"] = "0"
         self._send_headers(200, headers)
-        self.wfile.write(body)
+        self.wfile.write(css_text)
 
     def _send_file(self, body: bytes, fmt: str, filename: str) -> None:
         headers = self._common_headers()
