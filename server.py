@@ -5,8 +5,6 @@ Serves the web UI and a small JSON API:
     GET  /                     -> web UI (index.html)
     GET  /static/style.css     -> stylesheet
     POST /api/naturalize       -> {text, style?, use_llm?} -> result JSON
-    POST /api/naturalize/stream-> intentionally unavailable; local drafts are
-                                  processed through the reviewable JSON endpoint
     POST /api/batch            -> {texts: [...], style?, use_llm?} -> results JSON
     POST /api/upload           -> multipart {file, style?, use_llm?} -> result JSON,
                                   or ?format=txt|docx|pdf to download the rewrite
@@ -14,10 +12,6 @@ Serves the web UI and a small JSON API:
     POST /api/detect           -> {text, style?} -> detector report (per-sentence
                                   labels, AI/mixed/human distribution, verdict)
     POST /api/plagiarism       -> {text, refs: [...]} -> similarity report
-    POST /api/perfect          -> intentionally unavailable; no detector-outcome
-                               feedback loop is exposed
-    POST /api/compare          -> intentionally unavailable; no external-provider
-                               or proprietary-output comparison is exposed
     GET  /api/detectors        -> local detector status only
     GET  /api/history          -> saved history entries (input + rewrite + scores)
     POST /api/history/delete   -> {id} -> remove one entry
@@ -191,14 +185,9 @@ def _normalize_style(value):
 
 
 def _normalize_provider(value) -> str:
-    """Validate a provider choice from a request."""
+    """Validate a provider choice from a request (local-only)."""
     value = (value or "auto").lower().strip()
-    try:
-        from naturalizer.llm import PROVIDER_NAMES
-
-        return value if value in PROVIDER_NAMES else "auto"
-    except Exception:  # pragma: no cover - defensive
-        return value if value in ("auto", "claude", "cx") else "auto"
+    return value if value in ("auto", "local") else "auto"
 
 
 def _normalize_intensity(value, cap: float = 1.0) -> float:
@@ -562,16 +551,6 @@ class Handler(BaseHTTPRequestHandler):
                 "error": "Real-time streaming humanization is intentionally disabled. Naturalizer processes local drafts as reviewable edits."
             })
             return
-        if path == "/api/naturalize/stream-disabled":
-            data = _load_body(self)
-            if data is None:
-                self._send_json(413, {"error": "request body too large"})
-                return
-            if data is _INVALID_JSON:
-                self._send_json(400, {"error": "invalid JSON body"})
-                return
-            self._handle_stream(data)
-            return
 
         data = _load_body(self)
         if data is None:
@@ -675,71 +654,11 @@ class Handler(BaseHTTPRequestHandler):
                 "error": "Feedback-loop optimization for detector outcomes is intentionally disabled. Use the standard local rewrite and review the result instead."
             })
             return
-        elif path == "/api/perfect-disabled":
-            text = data.get("text", "")
-            if not isinstance(text, str) or not text.strip():
-                self._send_json(400, {"error": "missing or empty 'text'"})
-                return
-            style_raw = data.get("style", "academic")
-            style = _normalize_style(style_raw)
-            if style is None:
-                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
-                return
-            features = plan_features()
-            if not features["llm"]:
-                # The feedback loop runs on the deterministic engine too, but
-                # it converges far better with an LLM — gate like the LLM path.
-                self._send_json(402, {
-                    "error": "Perfect humanize (feedback loop) needs an LLM provider — "
-                    "it's a Pro feature; set NATURALIZER_PLAN=pro or configure "
-                    "an LLM in .env.local.",
-                    "plan": plan_status(),
-                })
-                return
-            allowed, quota_err = check_word_quota(len(text.split()))
-            if not allowed:
-                self._send_json(429, {"error": quota_err, "plan": plan_status()})
-                return
-            from naturalizer.feedback import feedback_humanize
-
-            provider = _normalize_provider(data.get("provider"))
-            intensity = _normalize_intensity(data.get("intensity"))
-            seed = _normalize_seed(data.get("seed"))
-            result = feedback_humanize(
-                engine,
-                text,
-                style=style,
-                intensity=intensity,
-                seed=seed,
-                provider=provider,
-            )
-            record_usage(len(text.split()))
-            _save_history(
-                result, text, style, "perfect", provider, intensity,
-                seed=seed, extra={"passes": result.get("passes")},
-            )
-            self._send_json(200, result)
         elif path == "/api/compare":
             self._send_json(410, {
                 "error": "External provider comparison is intentionally disabled. Naturalizer does not imitate or benchmark proprietary commercial writers."
             })
             return
-        elif path == "/api/compare-disabled":
-            text = data.get("text", "")
-            if not isinstance(text, str) or not text.strip():
-                self._send_json(400, {"error": "missing or empty 'text'"})
-                return
-            style_raw = data.get("style", "academic")
-            style = _normalize_style(style_raw)
-            if style is None:
-                self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
-                return
-            from naturalizer.compare import run_comparison
-
-            # Server-side comparison stays on the deterministic engines (fast,
-            # free) + key-gated external APIs; live site scraping is CLI-only.
-            report = run_comparison(text, style=style, use_llm=False)
-            self._send_json(200, report)
         elif path == "/api/naturalize":
             text = data.get("text", "")
             if not isinstance(text, str) or not text.strip():
@@ -750,26 +669,12 @@ class Handler(BaseHTTPRequestHandler):
             if style is None:
                 self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
                 return
-            features = plan_features()
-            plan_note = None
-            use_llm = False
-            deep = bool(data.get("deep"))
-            if deep:
+            if data.get("deep"):
                 self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
                 return
-            if not features["llm"]:
-                if use_llm:
-                    plan_note = (
-                        "Free plan — the LLM rewrite is a Pro feature; using the "
-                        "deterministic rewrite instead."
-                    )
-                use_llm = False
-            if deep and not features["deep"]:
-                self._send_json(402, {
-                    "error": "Extended chain processing is disabled in Naturalizer's local-only scope.",
-                    "plan": plan_status(),
-                })
-                return
+            features = plan_features()
+            use_llm = False
+            deep = False
             allowed, quota_err = check_word_quota(len(text.split()))
             if not allowed:
                 self._send_json(429, {"error": quota_err, "plan": plan_status()})
@@ -793,8 +698,6 @@ class Handler(BaseHTTPRequestHandler):
             record_usage(len(text.split()))
             _save_history(result, text, style, "naturalize", provider, intensity, seed=seed)
             payload = result.to_dict()
-            if plan_note:
-                payload["plan_note"] = plan_note
             self._send_json(200, payload)
         elif path == "/api/batch":
             texts = data.get("texts")
@@ -834,139 +737,6 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "not found"})
 
     # -- streaming -----------------------------------------------------------
-
-    def _handle_stream(self, data: dict) -> None:
-        """SSE stream of a naturalize run: status -> delta* -> done|error."""
-        text = data.get("text", "")
-        if not isinstance(text, str) or not text.strip():
-            self._send_json(400, {"error": "missing or empty 'text'"})
-            return
-        style_raw = data.get("style", "academic")
-        style = _normalize_style(style_raw)
-        if style is None:
-            self._send_json(400, {"error": f"unknown style '{style_raw}'", "styles": STYLE_NAMES})
-            return
-        features = plan_features()
-        plan_note = None
-        use_llm = False
-        if not features["llm"]:
-            if use_llm:
-                plan_note = (
-                    "Free plan — the LLM rewrite is a Pro feature; using the "
-                    "deterministic rewrite instead."
-                )
-            use_llm = False
-        deep = bool(data.get("deep"))
-        if deep:
-            self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
-            return
-        if deep and not features["deep"]:
-            self._send_json(402, {
-                "error": "Deep humanize (translation chain) is a Pro feature — "
-                "set NATURALIZER_PLAN=pro or configure an LLM in .env.local.",
-                "plan": plan_status(),
-            })
-            return
-        allowed, quota_err = check_word_quota(len(text.split()))
-        if not allowed:
-            self._send_json(429, {"error": quota_err, "plan": plan_status()})
-            return
-        provider = _normalize_provider(data.get("provider"))
-        intensity = _normalize_intensity(
-            data.get("intensity"), cap=features.get("max_intensity", 1.0)
-        )
-        seed = _normalize_seed(data.get("seed"))
-        rewrite_mode = _normalize_rewrite_mode(data.get("rewrite_mode"))
-
-        headers = self._common_headers()
-        headers["Content-Type"] = "text/event-stream; charset=utf-8"
-        headers["Cache-Control"] = "no-cache"
-        headers["Connection"] = "close"
-        self._send_headers(200, headers)
-
-        def _sse(event: str, payload: dict) -> None:
-            body = json.dumps(payload)
-            self.wfile.write(f"event: {event}\ndata: {body}\n\n".encode("utf-8"))
-            self.wfile.flush()
-
-        from naturalizer.streaming import naturalize_stream
-
-        # Heartbeats: the generator runs on a worker thread and events are
-        # pumped over a queue. While the generator is quiet (a slow LLM or
-        # a deep-chain hop), a `ping` event is sent every few seconds so the
-        # client knows the connection is alive instead of staring at a
-        # frozen "Streaming…". Total runtime is capped so a stuck provider
-        # can never hold the connection open forever.
-        _PING_EVERY = 8.0      # seconds of silence before a ping
-        _STREAM_CAP = 600.0    # hard ceiling for one stream (seconds)
-        ev_q: "queue.Queue" = queue.Queue()
-
-        def _pump() -> None:
-            try:
-                for event in naturalize_stream(
-                    text,
-                    style=style,
-                    use_llm=use_llm,
-                    deep=deep,
-                    provider=provider,
-                    intensity=intensity,
-                    seed=seed,
-                    rewrite_mode=rewrite_mode,
-                ):
-                    ev_q.put(("event", event))
-            except Exception as exc:  # pragma: no cover - defensive
-                ev_q.put(("error", f"stream failed: {exc}"))
-            ev_q.put(("stop", None))
-
-        threading.Thread(target=_pump, daemon=True).start()
-        started = time.time()
-        try:
-            while True:
-                try:
-                    kind, payload = ev_q.get(timeout=_PING_EVERY)
-                except queue.Empty:
-                    if time.time() - started > _STREAM_CAP:
-                        _sse("error", {"message": "stream timed out"})
-                        break
-                    _sse("ping", {})
-                    continue
-                if kind == "stop":
-                    break
-                if kind == "error":
-                    _sse("error", {"message": payload})
-                    break
-                event = payload
-                if event["type"] == "status":
-                    status = {"step": event["step"]}
-                    if event.get("detail"):
-                        status["detail"] = event["detail"]
-                    _sse("status", status)
-                elif event["type"] == "delta":
-                    _sse("delta", {"text": event["text"]})
-                elif event["type"] == "clear":
-                    # Deterministic preview finished; the LLM rewrite is
-                    # about to stream — tell the client to reset the pane.
-                    _sse("clear", {})
-                elif event["type"] == "done":
-                    result = event["result"]
-                    if plan_note:
-                        result["plan_note"] = plan_note
-                    _sse("done", result)
-                    record_usage(len(text.split()))
-                    _save_history(
-                        result, text, style, "naturalize", provider,
-                        intensity, seed=seed,
-                    )
-                elif event["type"] == "error":
-                    _sse("error", {"message": event["message"]})
-        except (BrokenPipeError, ConnectionResetError):  # client went away
-            pass
-        finally:
-            # SSE has no content-length: the stream ends when the server
-            # closes the connection (the client reads until EOF).
-            self.close_connection = True
-
-    # -- upload / export ----------------------------------------------------
 
     def _handle_upload(self, parsed) -> None:
         content_type_header = self.headers.get("Content-Type", "")
@@ -1054,23 +824,15 @@ class Handler(BaseHTTPRequestHandler):
                 "contain no extractable text."
             )
 
-        features = plan_features()
-        plan_note = None
-        use_llm = False
         if deep:
             self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
             return
-        if deep and not features["deep"]:
-            self._send_json(402, {
-                "error": "Deep humanize (translation chain) is a Pro feature — "
-                "set NATURALIZER_PLAN=pro or configure an LLM in .env.local.",
-                "plan": plan_status(),
-            })
-            return
+        use_llm = False
         allowed, quota_err = check_word_quota(len(original.split()))
         if not allowed:
             self._send_json(429, {"error": quota_err, "plan": plan_status()})
             return
+        features = plan_features()
         intensity = _normalize_intensity(
             intensity, cap=features.get("max_intensity", 1.0)
         )
@@ -1101,8 +863,6 @@ class Handler(BaseHTTPRequestHandler):
         payload = result.to_dict()
         payload["format"] = fmt
         payload["warnings"] = warnings
-        if plan_note:
-            payload["plan_note"] = plan_note
         self._send_json(200, payload)
 
     def _handle_export(self, data: dict) -> None:
@@ -1157,33 +917,12 @@ def main() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     httpd = ThreadingHTTPServer((host, port), Handler)
     print(f"Naturalizer v{__version__} running at http://{host}:{port}")
-    print(f"LLM backend: {_llm_status()}")
+    print("LLM backend: local deterministic engine only (cloud rewrites not included)")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down.")
         httpd.server_close()
-
-
-def _llm_on() -> bool:
-    try:
-        from naturalizer.llm import llm_available
-
-        return llm_available()
-    except Exception:  # pragma: no cover
-        return False
-
-
-def _llm_status() -> str:
-    try:
-        from naturalizer.llm import llm_provider_label
-
-        label = llm_provider_label()
-        if label:
-            return f"configured — {label}"
-    except Exception:  # pragma: no cover
-        pass
-    return "off (deterministic only)"
 
 
 if __name__ == "__main__":

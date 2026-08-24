@@ -124,18 +124,3 @@ class StyleTransferredTest(unittest.TestCase):
 class HumanizerMustNotFlipHumanTest(unittest.TestCase):
     """H4 — running the humanizer itself on human text must not turn it AI."""
 
-    def test_perfect_loop_keeps_human_text_human(self):
-        from naturalizer.feedback import feedback_humanize
-
-        engine = Naturalizer(seed=0, prefer_llm=False)
-        for i, sample in enumerate(HUMAN):
-            with self.subTest(sample=i):
-                result = feedback_humanize(engine, sample, style="academic", max_passes=2)
-                out = result["text"]
-                report = analyze(out)
-                self.assertGreaterEqual(report.score, 70, out[:120])
-                self.assertNotIn("high", [x.severity for x in report.issues], out[:120])
-
-
-if __name__ == "__main__":
-    unittest.main()

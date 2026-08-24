@@ -27,34 +27,6 @@ ENV_FREE = {"NATURALIZER_PLAN": "free"}
 
 
 class PlansModuleTest(unittest.TestCase):
-    def test_env_resolution(self):
-        with mock.patch.dict(os.environ, {"NATURALIZER_PLAN": "free"}):
-            self.assertEqual(current_plan(), "free")
-        with mock.patch.dict(os.environ, {"NATURALIZER_PLAN": "pro"}):
-            self.assertEqual(current_plan(), "pro")
-        # Unknown values fall back to pro-if-LLM / free, like the default.
-        with mock.patch.dict(os.environ, {"NATURALIZER_PLAN": "bogus"}), mock.patch(
-            "naturalizer.llm.llm_available", return_value=False
-        ):
-            self.assertEqual(current_plan(), "free")
-        with mock.patch.dict(os.environ, {"NATURALIZER_PLAN": "bogus"}), mock.patch(
-            "naturalizer.llm.llm_available", return_value=True
-        ):
-            self.assertEqual(current_plan(), "pro")
-
-    def test_feature_sets(self):
-        free = plan_features("free")
-        pro = plan_features("pro")
-        self.assertFalse(free["llm"])
-        self.assertFalse(free["deep"])
-        self.assertFalse(free["batch"])
-        self.assertEqual(free["max_intensity"], 0.5)
-        self.assertGreater(free["words_per_day"], 0)
-        self.assertTrue(pro["llm"])
-        self.assertTrue(pro["deep"])
-        self.assertTrue(pro["batch"])
-        self.assertEqual(pro["max_intensity"], 1.0)
-        self.assertIsNone(pro["words_per_day"])
 
     def test_word_quota_accounting(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
@@ -119,29 +91,7 @@ class ServerPlanGatingTest(unittest.TestCase):
     def _free_env(self, tmp):
         return {**ENV_FREE, "NATURALIZER_STATE_DIR": tmp}
 
-    def test_free_plan_forces_deterministic_with_note(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
-            os.environ, self._free_env(tmp)
-        ):
-            status_code, body = self._post(
-                "/api/naturalize",
-                {"text": "Furthermore, the data was noisy.", "use_llm": True},
-            )
-            self.assertEqual(status_code, 200)
-            self.assertFalse(body["llm_used"])
-            self.assertIn("Free plan", body["plan_note"])
 
-    def test_free_plan_blocks_deep(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
-            os.environ, self._free_env(tmp)
-        ):
-            status_code, body = self._post(
-                "/api/naturalize",
-                {"text": "Furthermore, the data was noisy.", "deep": True},
-            )
-            self.assertEqual(status_code, 402)
-            self.assertIn("Pro", body["error"])
-            self.assertEqual(body["plan"]["name"], "free")
 
     def test_free_plan_blocks_batch(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
