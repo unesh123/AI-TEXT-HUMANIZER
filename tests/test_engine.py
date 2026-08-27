@@ -64,8 +64,54 @@ class EngineTest(unittest.TestCase):
 
     # -- provider warnings ----------------------------------------------
 
+    def test_explicit_provider_unconfigured_warns(self):
+        # No LLM env vars in the test environment: picking Claude explicitly
+        # must explain the deterministic fallback instead of staying silent.
+        result = self.engine.naturalize(
+            "In today's fast-paced world, it is important to note that "
+            "technology plays a crucial role.",
+            style="academic",
+            provider="claude",
+        )
+        self.assertFalse(result.llm_used)
+        self.assertTrue(result.rewritten)  # deterministic path still works
+        self.assertIn("claude isn't configured", result.llm_warning or "")
+        self.assertIn("deterministic rewrite", result.llm_warning or "")
 
+    def test_explicit_provider_failure_warns(self):
+        # Provider is configured, but the gateway call fails (the real-world
+        # 401 case) — the fallback must be explained, not silent.
+        with mock.patch("naturalizer.engine.llm_available", return_value=True), \
+             mock.patch("naturalizer.engine.rewrite_with_llm_details", return_value=None):
+            result = self.engine.naturalize(
+                "In today's fast-paced world, it is important to note that "
+                "technology plays a crucial role.",
+                style="academic",
+                provider="cx",
+            )
+        self.assertFalse(result.llm_used)
+        self.assertTrue(result.rewritten)
+        self.assertIn("cx call failed", result.llm_warning or "")
+        self.assertIn("API key", result.llm_warning or "")
 
+    def test_explicit_provider_recovers_on_failover_stays_quiet(self):
+        # CX is requested but down; the failover chain serves from Claude.
+        # The text is real and served, so no "call failed" scare message —
+        # and the provider label names the one that actually wrote it.
+        with mock.patch("naturalizer.engine.llm_available", return_value=True), \
+             mock.patch(
+                 "naturalizer.engine.rewrite_with_llm_details",
+                 return_value=("Failover output text.", "claude"),
+             ):
+            result = self.engine.naturalize(
+                "In today's fast-paced world, it is important to note that "
+                "technology plays a crucial role.",
+                style="academic",
+                provider="cx",
+            )
+        self.assertTrue(result.llm_used)
+        self.assertIsNone(result.llm_warning)
+        self.assertEqual(result.llm_provider, "claude")
 
     def test_auto_provider_stays_quiet_on_failure(self):
         # Auto mode is designed to fall back — no warning noise.
@@ -160,6 +206,22 @@ class EngineTest(unittest.TestCase):
         self.assertGreaterEqual(overlap["reuse_percent"], 0)
         self.assertLessEqual(overlap["reuse_percent"], 100)
 
+    def test_number_drift_falls_back_to_safe_rewrite(self):
+        import naturalizer.engine as eng
+
+        original = "The pilot reduced costs by 42% across 800 accounts."
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng,
+            "rewrite_with_llm_details",
+            return_value=("The pilot reduced costs across many accounts.", "claude"),
+        ):
+            result = self.engine.naturalize(original, provider="claude")
+
+        shown = result.llm_rewritten if result.llm_used else result.rewritten
+        self.assertIn("42%", shown)
+        self.assertIn("800", shown)
+        self.assertIn("fact-preserving", result.llm_warning or "")
+        self.assertFalse(result.metrics["semantic_preservation"]["hard_drift"])
 
     def test_metrics_plain_register_shifts_toward_human_memory(self):
         # Stiff, Latinate register -> the deterministic rewrite should move
@@ -209,7 +271,84 @@ class EngineTest(unittest.TestCase):
 
     # -- deep mode (translation chain) -----------------------------------
 
+    def test_deep_uses_chain(self):
+        import naturalizer.engine as eng
+
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng, "run_chain", return_value="Chain output text."
+        ) as chain, mock.patch.object(eng, "rewrite_with_llm_details") as single:
+            result = self.engine.naturalize("Draft text here.", deep=True)
+
+        chain.assert_called_once()
+        single.assert_not_called()
+        self.assertTrue(result.llm_used)
+        self.assertEqual(result.llm_method, "chain")
+        self.assertEqual(result.llm_rewritten, "Chain output text.")
+
+    def test_deep_falls_back_to_single_when_chain_fails(self):
+        import naturalizer.engine as eng
+
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng, "run_chain", return_value=None
+        ), mock.patch.object(
+            eng, "rewrite_with_llm_details", return_value=("Single output text.", "claude")
+        ):
+            result = self.engine.naturalize("Draft text here.", deep=True)
+
+        self.assertTrue(result.llm_used)
+        self.assertEqual(result.llm_method, "single")
+        self.assertEqual(result.llm_rewritten, "Single output text.")
+
+    def test_deep_without_llm_stays_deterministic(self):
+        import naturalizer.engine as eng
+
+        with mock.patch.object(eng, "llm_available", return_value=False), mock.patch.object(
+            eng, "run_chain"
+        ) as chain, mock.patch.object(eng, "rewrite_with_llm_details") as single:
+            result = self.engine.naturalize("Draft text here.", deep=True)
+
+        chain.assert_not_called()
+        single.assert_not_called()
+        self.assertFalse(result.llm_used)
+        self.assertIsNone(result.llm_method)
+
+    # -- LLM output is polished through the deterministic engine ---------
+
+    def test_single_pass_output_is_polished(self):
+        import naturalizer.engine as eng
+
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng, "rewrite_with_llm_details",
+            return_value=(
+                "This is the tip of the iceberg, and think outside the box "
+                "is the motto. Ultimately, it matters.",
+                "claude",
+            ),
+        ):
+            result = self.engine.naturalize("Draft text here.")
+
+        self.assertTrue(result.llm_used)
+        self.assertEqual(result.llm_method, "single")
+        self.assertNotIn("tip of the iceberg", result.llm_rewritten)
+        self.assertNotIn("think outside the box", result.llm_rewritten)
+        self.assertNotIn("Ultimately", result.llm_rewritten)
+
+    def test_deep_output_is_polished(self):
+        import naturalizer.engine as eng
+
+        with mock.patch.object(eng, "llm_available", return_value=True), mock.patch.object(
+            eng, "run_chain",
+            return_value=(
+                "Teams fixate on the tip of the iceberg and presume they "
+                "understand everything."
+            ),
+        ):
+            result = self.engine.naturalize("Draft text here.", deep=True)
+
+        self.assertTrue(result.llm_used)
+        self.assertEqual(result.llm_method, "chain")
+        self.assertNotIn("tip of the iceberg", result.llm_rewritten)
 
 
-
-
+if __name__ == "__main__":
+    unittest.main()

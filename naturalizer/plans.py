@@ -34,7 +34,7 @@ PLANS: Dict[str, Dict] = {
         "label": "Free",
         "features": {
             "llm": False,
-            "deep": False,
+            "deep": True,
             "batch": False,
             "perfect": False,
             "sentence_rehumanize": True,
@@ -48,7 +48,7 @@ PLANS: Dict[str, Dict] = {
         "label": "Pro",
         "features": {
             "llm": False,
-            "deep": False,
+            "deep": True,
             "batch": True,
             "perfect": False,
             "sentence_rehumanize": True,

@@ -181,9 +181,59 @@ class ServerTest(unittest.TestCase):
         self.assertLessEqual(body["confidence"], 45)
         self.assertIn("evidence_coverage", body)
 
+    def test_naturalize_stream_endpoint(self):
+        # The SSE endpoint returns text/event-stream with status/delta/done
+        # events; deltas reassemble the deterministic rewrite (no LLM in the
+        # test env).
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/naturalize/stream",
+            data=json.dumps({
+                "text": "In today's fast-paced world, it is important to note "
+                "that technology plays a crucial role.",
+                "style": "academic",
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            self.assertEqual(
+                resp.headers.get("Content-Type"),
+                "text/event-stream; charset=utf-8",
+            )
+            raw = resp.read().decode("utf-8")
+        self.assertIn("event: status", raw)
+        self.assertIn("event: delta", raw)
+        self.assertIn("event: done", raw)
+        self.assertIn('"step": "analyzing"', raw)
+        # The done event carries a full result payload.
+        done = raw.split("event: done\ndata: ")[1].split("\n\n")[0]
+        payload = json.loads(done)
+        self.assertIn("rewritten", payload)
+        self.assertIn("score", payload)
+        self.assertIn("metrics", payload)
 
+    def test_naturalize_stream_rejects_empty(self):
+        status, body = self._post("/api/naturalize/stream", {"text": ""})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
 
+    def test_naturalize_stream_rejects_bad_style(self):
+        status, body = self._post(
+            "/api/naturalize/stream", {"text": "hello there", "style": "nope"}
+        )
+        self.assertEqual(status, 400)
 
+    def test_naturalize_accepts_deep_flag(self):
+        # No LLM is configured in the test process, so deep just falls back
+        # to the deterministic path — the point is the flag is accepted and
+        # the response carries the llm_method field.
+        status, body = self._post(
+            "/api/naturalize",
+            {"text": "Furthermore, the data was noisy.", "deep": True},
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("llm_method", body)
+        self.assertFalse(body["llm_used"])
 
     def test_naturalize_rejects_empty(self):
         status, body = self._post("/api/naturalize", {"text": ""})
@@ -338,6 +388,91 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("error", body)
 
+    def test_status_advertises_providers(self):
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/api/status", timeout=10
+        ) as resp:
+            status = json.loads(resp.read().decode("utf-8"))
+        self.assertIn("providers", status)
+        names = [p["name"] for p in status["providers"]]
+        self.assertIn("auto", names)
+        self.assertIn("claude", names)
+        self.assertIn("cx", names)
+
+    def test_naturalize_accepts_provider(self):
+        status, body = self._post(
+            "/api/naturalize",
+            {
+                "text": "Furthermore, the data was noisy.",
+                "provider": "cx",
+                "use_llm": True,
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("llm_provider", body)
+        # With no provider keys in the test env, an explicit provider must
+        # explain the fallback in the API response too.
+        self.assertIn("llm_warning", body)
+        self.assertIn("cx isn't configured", body["llm_warning"])
+
+    def test_naturalize_accepts_new_provider(self):
+        status, body = self._post(
+            "/api/naturalize",
+            {
+                "text": "Furthermore, the data was noisy.",
+                "provider": "gemini",
+                "use_llm": True,
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("llm_warning", body)
+        self.assertIn("gemini isn't configured", body["llm_warning"])
+
+    def test_perfect_endpoint(self):
+        status, body = self._post(
+            "/api/perfect",
+            {
+                "text": "In today's fast-paced world, it is important to note that tech plays a crucial role. "
+                "Furthermore, the ever-evolving landscape of digital tools transforms the way we work. "
+                "Moreover, organizations must leverage cutting-edge solutions to remain competitive.",
+                "style": "academic",
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("text", body)
+        self.assertIn("passes", body)
+        self.assertIn("scores", body)
+        self.assertIn("detectors", body)
+        self.assertGreaterEqual(body["passes"], 1)
+        self.assertEqual(len(body["scores"]), body["passes"] + 1)
+        self.assertTrue(body["text"].strip())
+
+    def test_perfect_rejects_empty(self):
+        status, body = self._post("/api/perfect", {"text": ""})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
+
+    def test_detectors_endpoint(self):
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/api/detectors", timeout=10
+        ) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        names = [d["name"] for d in data["detectors"]]
+        self.assertIn("local", names)
+        self.assertIn("gptzero", names)
+        local = next(d for d in data["detectors"] if d["name"] == "local")
+        self.assertTrue(local["configured"])
+        self.assertTrue(local["live"])
+
+    def test_detectors_scan_endpoint(self):
+        # No keys in the hermetic env -> no third-party results, no crash.
+        status, body = self._post("/api/detectors/scan", {"text": "Hello world."})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["results"], [])
+
+        status, body = self._post("/api/detectors/scan", {"text": "  "})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
 
     def test_detect_marks_exact_prior_generated_output_as_ai_derived(self):
         source = "Technology affects everyday life, from work and study to the way people stay in touch with friends."

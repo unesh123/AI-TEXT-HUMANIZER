@@ -3,8 +3,9 @@
 A dependency-free toolkit that turns stiff, machine-generated prose into
 natural, human-sounding writing. It scores drafts for "AI tells"
 (repetitive openers, filler phrases, uniform sentence rhythm) and rewrites
-them with deterministic, semantics-preserving transformations. Naturalizer
-runs fully locally; no cloud model backend is included.
+them with deterministic, semantics-preserving transformations. An optional
+LLM backend (Claude + CX GPT gateway, configured via .env.local) can be
+enabled for higher-quality rewrites.
 """
 
 from .engine import Naturalizer, NaturalizeResult

@@ -50,8 +50,19 @@ def _requires_full_rewrite_retry(original: str, candidate: str) -> bool:
     return overlap > 20.0
 
 
-# Naturalizer is local-only: no cloud LLM backend and no translation
-# chain. Every rewrite is deterministic, offline, and reviewable.
+try:
+    from .llm import llm_available, llm_provider_label, rewrite_with_llm, rewrite_with_llm_details
+    from .chain import run_chain, run_multi_provider, run_extended_chain, run_hybrid_chain, run_best_chain
+except ImportError:  # pragma: no cover - defensive
+    llm_available = lambda provider="auto": False
+    llm_provider_label = lambda provider="auto": None
+    rewrite_with_llm = lambda text, style="academic", provider="auto", instruction=None, voice=0, best_of=1: None
+    rewrite_with_llm_details = lambda text, style="academic", provider="auto", instruction=None, voice=0, best_of=1: None
+    run_chain = lambda text, style="academic", provider="auto": None
+    run_multi_provider = lambda text, style="academic", provider="auto": None
+    run_extended_chain = lambda text, style="academic", provider="auto": None
+    run_hybrid_chain = lambda text, style="academic", provider="auto": None
+    run_best_chain = lambda text, style="academic", provider="auto": None
 
 
 @dataclass
@@ -64,9 +75,9 @@ class NaturalizeResult:
     issues: List[Dict] = field(default_factory=list)
     llm_rewritten: Optional[str] = None
     llm_used: bool = False
-    # Legacy fields (local-only build): always None / False. Retained so the
-    # API shape stays backward compatible with older clients.
+    # "chain" (translation chain) or "single" (one-pass LLM rewrite).
     llm_method: Optional[str] = None
+    # Provider used for the LLM rewrite ("claude" | "cx"), when one ran.
     llm_provider: Optional[str] = None
     style: str = DEFAULT_STYLE
     sentence_count: int = 0
@@ -76,7 +87,8 @@ class NaturalizeResult:
     # Advanced detection signals: {"before": {...}, "after": {...}} — the
     # post-rewrite re-scan, so the UI can show the verification delta.
     metrics: Dict = field(default_factory=dict)
-    # Legacy field (local-only build): always None.
+    # Explains a failed/explicitly-selected provider, so a silent fallback
+    # to the deterministic rewrite is never unexplained ("cx" 401, etc.).
     llm_warning: Optional[str] = None
 
     def to_dict(self) -> Dict:
@@ -113,21 +125,36 @@ class Naturalizer:
         use_llm: Optional[bool] = None,
         seed: Optional[int] = None,
         deep: bool = False,
+        chain_mode: str = "standard",
         provider: str = "auto",
         intensity: float = 0.5,
         instruction: Optional[str] = None,
         best_of: int = 1,
         rewrite_mode: str = "full",
     ) -> NaturalizeResult:
-        """Score *text* and produce a deterministic local rewrite.
+        """Score *text* and produce rewritten versions.
 
-        Naturalizer is local-only: there is no cloud LLM backend and no
-        translation chain. The ``use_llm``, ``deep``, ``provider``,
-        ``instruction``, and ``best_of`` parameters are retained for API
-        backward compatibility but are inert — the deterministic engine is
-        always used. *intensity* (0-1) scales how aggressively the
-        deterministic rewrite restructures the prose, and *seed* controls
-        run-to-run word-choice variety.
+        *use_llm*: ``None`` means "use LLM if configured and *prefer_llm*",
+        ``True`` forces the LLM path (falling back to deterministic on
+        failure), ``False`` disables it. *deep* routes the LLM rewrite
+        through a translation chain. *chain_mode* selects the chain strategy:
+
+        - ``"standard"`` (default) — 4-hop chain (EN -> 中文 -> 日本語 -> suomi -> EN)
+        - ``"extended"`` — 6-hop chain through more distant languages
+        - ``"multi"`` — rewrite through every available provider, pick best
+        - ``"hybrid"`` — chain + multi-provider, rank all outputs together
+        - ``"best"`` — try all strategies, return highest-scoring result
+
+        The chain
+        for maximum structural disruption; it falls back to the single-pass
+        rewrite, then deterministic, if the chain fails. *intensity* (0-1)
+        scales how aggressively the deterministic rewrite restructures the
+        prose — higher values also add run-to-run variety, which ``seed``
+        controls (a different seed yields different word choices).
+        *best_of* (>1) generates that many LLM candidates and keeps the
+        best that survives the factual critics (numbers preserved, then
+        highest naturalness) — best-of-N selection, off by default so the
+        single-shot path stays cheap and deterministic.
         """
         text = (text or "").strip()
         rewrite_mode = str(rewrite_mode or "full").strip().lower()
@@ -168,15 +195,125 @@ class Naturalizer:
             contractions=profile.get("contractions", False),
         )
 
-        # Local-only rewrite path: the deterministic engine is the sole
-        # backend. There is no LLM attempt, no provider failover, and no
-        # translation-chain hop to coordinate.
         llm_used = False
         llm_rewritten = None
         llm_method: Optional[str] = None
         llm_provider: Optional[str] = None
         candidate: Optional[str] = None
         llm_warning: Optional[str] = None
+        want_llm = self.prefer_llm if use_llm is None else use_llm
+        llm_attempted = want_llm and llm_available(provider)
+        if llm_attempted:
+            if deep:
+                _chain_fns = {
+                    "standard": run_chain,
+                    "extended": run_extended_chain,
+                    "multi": run_multi_provider,
+                    "hybrid": run_hybrid_chain,
+                    "best": run_best_chain,
+                }
+                _chain_fn = _chain_fns.get(chain_mode, run_chain)
+                try:
+                    candidate = _chain_fn(text, style=style, provider=provider)
+                except Exception:  # pragma: no cover - network/timeout edge
+                    candidate = None
+                if candidate:
+                    llm_method = chain_mode if chain_mode != "standard" else "chain"
+                    label = llm_provider_label(provider)
+                    llm_provider = (label or "").split(" ")[0] or None
+                else:
+                    candidate_provider = rewrite_with_llm_details(
+                        text, style=style, provider=provider, voice=rng.randrange(1, 5)
+                    )
+                    if candidate_provider:
+                        candidate, llm_provider = candidate_provider
+                        llm_method = "single"
+            else:
+                candidate_provider = rewrite_with_llm_details(
+                    text,
+                    style=style,
+                    provider=provider,
+                    instruction=instruction,
+                    voice=rng.randrange(1, 5),
+                    best_of=best_of,
+                )
+                if candidate_provider:
+                    candidate, llm_provider = candidate_provider
+                    llm_method = "single"
+            # Full re-author is not allowed to silently become synonym
+            # swapping. When the first candidate reuses too much source
+            # phrasing, request one focused replacement before accepting it.
+            if candidate and rewrite_mode == "full" and _requires_full_rewrite_retry(text, candidate):
+                retry_instruction = "\n\n".join(part for part in (
+                    instruction,
+                    "The previous rewrite was too close to the draft. Replace it completely: rebuild every sentence and do not reuse five-word sequences from the draft except required names, numbers, quotations, or technical terms.",
+                ) if part)
+                retry_provider = rewrite_with_llm_details(
+                    text,
+                    style=style,
+                    provider=provider,
+                    instruction=retry_instruction,
+                    voice=rng.randrange(1, 5),
+                )
+                if retry_provider:
+                    candidate, llm_provider = retry_provider
+                    llm_method = "single_retry"
+                if _requires_full_rewrite_retry(text, candidate):
+                    llm_warning = (
+                        "The configured model returned a rewrite that still shares too much source phrasing "
+                        "after a strict retry. Review the source-replacement metric or try another configured model."
+                    )
+            # *llm_provider* already holds the provider that actually
+            # served (failover-aware): when the user asked for cx but
+            # cx was rate-limited, this is "claude" — never a lie.
+            if candidate:
+                # Polish the LLM output with the deterministic engine. The
+                # translation chain (and to a lesser degree any LLM) can
+                # re-render tells — e.g. a cliché that survives four hops —
+                # so the final pass guarantees LLM output clears the same
+                # naturalness floor as the deterministic path.
+                polished, _, _ = deterministic_rewrite(
+                    candidate,
+                    rng=rng,
+                    allowlist=profile["allowlist"],
+                    min_words=profile["min_words"],
+                    max_words=profile["max_words"],
+                    intensity=intensity,
+                    contractions=profile.get("contractions", False),
+                )
+                llm_rewritten = polished.strip() or candidate
+                llm_used = True
+
+        # When the user picked a specific provider and *no* provider could
+        # produce a rewrite (every configured gateway failed), say so
+        # instead of silently falling back. A failed first choice that
+        # recovered on the failover provider stays quiet — the text is
+        # real and served, no scare message needed. (Auto mode is designed
+        # to fall back, so it stays quiet too.)
+        if rewrite_mode == "full" and llm_attempted and not llm_used:
+            llm_warning = llm_warning or (
+                "Full re-author needs a working LLM result. The fallback did not meet the "
+                "source-replacement target, so review the output or select a configured model."
+            )
+        if want_llm and provider != "auto" and not llm_used:
+            try:
+                from .llm import PROVIDER_NAMES
+
+                if provider in PROVIDER_NAMES:
+                    if not llm_available(provider):
+                        llm_warning = (
+                            f"{provider} isn't configured — add its env vars to "
+                            ".env.local (see README). Using the deterministic "
+                            "rewrite instead."
+                        )
+                    else:
+                        llm_warning = (
+                            f"{provider} call failed (check the gateway URL and "
+                            f"API key in .env.local). Using the deterministic "
+                            "rewrite instead."
+                        )
+            except Exception:  # pragma: no cover - defensive
+                pass
 
         # Semantic-preservation gate: a fluent rewrite that drops a number
         # is still wrong. Revert hard factual drift before returning it.
