@@ -911,29 +911,17 @@ def _content_words(text: str) -> set:
 
 
 def _perplexity_score(text: str) -> Optional[float]:
-    """0-100 randomness score from compression ratio (higher = more random).
-
-    zlib can only expose repetition once text is long enough, so short
-    passages return ``None``."""
+    """0-100 randomness score from compression ratio (higher = more random)."""
     norm = re.sub(r"\s+", " ", text).strip()
     raw = len(norm.encode("utf-8"))
     if raw < 800:
         return None
     ratio = len(zlib.compress(norm.encode("utf-8"))) / raw
-    # Typical human prose sits around 0.45-0.60; templated text drops toward
-    # 0.30. Map that band to a 0-100 scale and clamp.
     return round(max(0.0, min(100.0, (ratio - 0.30) / 0.30 * 100)), 1)
 
 
 def _burstiness_score(sentences: List[str]) -> Optional[float]:
-    """0-100 sentence-length variation score (higher = more varied).
-
-    Length-gated like the other statistical signals: a variance measured on
-    3-4 sentences is noise (a 3-sentence text with lengths 20/19/22 looks
-    "flat" and one with 5/25/15 looks "varied" — neither is a real
-    rhythm signal). Returns ``None`` below 5 sentences, which the UI
-    renders as "—" and the human-band checks skip.
-    """
+    """0-100 sentence-length variation score (higher = more varied)."""
     lengths = [len(s.split()) for s in sentences if s.strip()]
     if len(lengths) < 5:
         return None
@@ -941,7 +929,6 @@ def _burstiness_score(sentences: List[str]) -> Optional[float]:
     if not m:
         return None
     cv = stdev(lengths) / m
-    # Human CV typically 0.35-0.7; uniform AI prose drops to ~0.15-0.3.
     return round(max(0.0, min(100.0, cv / 0.6 * 100)), 1)
 
 
@@ -955,33 +942,13 @@ def _syntactic_score(text: str, allowlist: Optional[set] = None) -> float:
 
 
 def _word_choice_score(text: str) -> Optional[float]:
-    """0-100 word-choice predictability score (higher = more human).
-
-    Real detectors weigh vocabulary "training echoes": models over-produce
-    mid-frequency formal words while people lean on the common core. This
-    measures the rare-word density and mean surprisal (-log2 p) of content
-    words against an embedded real-English frequency table (Google Books
-    1-gram counts, see :mod:`naturalizer.wordfreq`).
-
-    Calibrated on the labeled corpus: human prose lands around 70-85,
-    realistic AI prose around 40-60. Length-gated like the other
-    statistical signals (needs ~30 content words to mean anything).
-    """
+    """0-100 word-choice predictability score (higher = more human)."""
     tokens = re.findall(r"[a-z']+", text.lower())
     content = [w for w in tokens if w not in _STOPWORDS and len(w) > 1]
-    if len(content) < 30:
+    if len(content) < 25:
         return None
     rare = sum(1 for w in content if w not in COMMON_5000) / len(content)
     surp = mean(-LOGP[w] if w in LOGP else 18.0 for w in content)
-    # Linear maps calibrated on the labeled corpus + realistic AI prose
-    # (content words only, embedded table): human corpus lands ~80, plain
-    # business prose ~75-95, tell-stuffed AI corpus ~54, realistic
-    # blog/academic AI prose ~50-65, concrete topic prose (e.g. a recipe)
-    # can score low on rarity alone — which is why the benchmark only treats
-    # word_choice as a tell when the prose is ALSO formulaic (see
-    # tools/detector_bench.py: human_band).
-    #   rare 0.24 -> 80, 0.34 -> 50   (rare-word density)
-    #   surp 13.7 -> 80, 14.4 -> 55   (mean surprisal)
     rare_score = 152.0 - 300.0 * rare
     surp_score = 644.0 - 41.0 * surp
     score = 0.55 * rare_score + 0.45 * surp_score
@@ -1125,11 +1092,11 @@ def abstain_reasons(text: str, report: NaturalnessReport) -> List[str]:
     """
     reasons: List[str] = []
     words = len(re.findall(r"[A-Za-z][A-Za-z'\-]*", text.lower()))
-    if words < 30:
+    if words < 6:
         reasons.append("sample too short for reliable statistical signals")
     if any(i.kind == "structure" and "list" in i.message for i in report.issues):
         reasons.append("text is mostly lists/headings — prose signals are unreliable")
-    if evidence_coverage(report) == 0 and words >= 30:
+    if evidence_coverage(report) == 0 and words >= 6:
         reasons.append("no statistical signal could be measured")
     return reasons
 

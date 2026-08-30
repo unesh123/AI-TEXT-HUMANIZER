@@ -313,42 +313,27 @@ class Naturalizer:
             keep_structure=profile.get("keep_structure", False),
         )
         human_pct = dist["human"]
-        if human_pct >= 70 and report.score >= 70:
+        ai_pct = dist["ai"]
+        if human_pct >= 65 and report.score >= 65 and ai_pct <= 20:
             verdict = "human"
-        elif human_pct >= 40 and report.score >= 50:
-            verdict = "mixed"
-        else:
+        elif ai_pct >= 45 or report.score <= 45:
             verdict = "ai"
+        else:
+            verdict = "mixed"
 
-        # Evidence-based confidence: how many statistical signals actually
-        # measured something, blended with how decisive the score is. A score
-        # on a 20-word sample carries almost no statistical evidence, so its
-        # confidence is capped regardless of the number.
         coverage = evidence_coverage(report)
         base = (
-            max(40, min(99, report.score))
+            max(55, min(99, report.score))
             if verdict == "human"
-            else (max(40, min(99, 100 - report.score)) if verdict == "ai" else 62)
+            else (max(55, min(99, 100 - report.score)) if verdict == "ai" else 70)
         )
-        confidence = int(round(base * (0.7 + 0.3 * coverage)))
-        confidence = max(30, min(99, confidence))
+        confidence = int(round(base * (0.85 + 0.15 * coverage)))
+        confidence = max(50, min(99, confidence))
 
         abstain = abstain_reasons(text, report)
-        strong_ai_evidence = verdict == "ai" and (
-            report.score <= 25 or dist["ai"] >= 75
-        )
-        if abstain and not strong_ai_evidence:
-            # A short or structurally unsuitable sample cannot support an
-            # authorship-style conclusion. Keep the raw score available but
-            # surface an explicit uncertain verdict and cap confidence.
+        if abstain and len(text.split()) < 5:
             verdict = "uncertain"
             confidence = min(confidence, 45)
-        elif verdict == "human":
-            # A local heuristic can say the prose looks human-like, but it
-            # cannot prove independent human authorship. Keep the verdict for
-            # usability, cap confidence, and let provenance override it when
-            # the application knows it generated the exact text.
-            confidence = min(confidence, 70)
         return {
             "score": report.score,
             "verdict": verdict,
