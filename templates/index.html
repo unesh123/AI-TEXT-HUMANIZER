@@ -1674,9 +1674,7 @@ function renderResult(r, opts) {
     planNote.hidden = true;
   }
   $("llm-note").textContent = r.llm_used
-    ? (r.llm_method === "chain"
-        ? `local rewrite · ${r.llm_provider || "Naturalizer"}`
-        : `local rewrite · ${r.llm_provider || "Naturalizer"}`)
+    ? (`StealthGPT (${(r.metrics && r.metrics.stealthgpt && r.metrics.stealthgpt.model) || "API"}) · tone: ${(r.metrics && r.metrics.stealthgpt && r.metrics.stealthgpt.tone) || r.style}`)
       + (resultMetrics.rewrite_mode ? ` · ${resultMetrics.rewrite_mode} approach` : "")
     : "";
   const llmWarn = $("llm-warn");

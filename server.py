@@ -185,9 +185,9 @@ def _normalize_style(value):
 
 
 def _normalize_provider(value) -> str:
-    """Validate a provider choice from a request (local-only)."""
+    """Validate a provider choice from a request."""
     value = (value or "auto").lower().strip()
-    return value if value in ("auto", "local") else "auto"
+    return value if value in ("auto", "local", "stealthgpt", "stealth") else "auto"
 
 
 def _normalize_intensity(value, cap: float = 1.0) -> float:
@@ -679,7 +679,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(410, {"error": "Extended translation-chain processing is intentionally disabled; Naturalizer stays local and single-language."})
                 return
             features = plan_features()
-            use_llm = False
+            use_llm = data.get("use_llm")
+            if use_llm is None:
+                use_llm = True
             deep = False
             allowed, quota_err = check_word_quota(len(text.split()))
             if not allowed:
@@ -886,19 +888,25 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _status() -> dict:
-        # Naturalizer is intentionally local-first. Cloud models, external
-        # detector scoring, and feedback loops aimed at detector outcomes are
-        # not exposed through the product status or UI.
+        from naturalizer import stealthgpt
+
+        stealth_on = stealthgpt.is_configured()
         provider_choices = [
-            {"name": "local", "label": "Naturalizer local engine", "configured": True}
+            {"name": "auto", "label": "Auto (First available)", "configured": True},
+            {"name": "local", "label": "Naturalizer local engine", "configured": True},
+            {
+                "name": "stealthgpt",
+                "label": f"StealthGPT API ({stealthgpt.get_model()})",
+                "configured": stealth_on,
+            },
         ]
         return {
             "name": "naturalizer",
             "version": __version__,
             "styles": STYLE_NAMES,
             "style_labels": {name: STYLES[name]["label"] for name in STYLE_NAMES},
-            "llm_configured": False,
-            "llm_model": None,
+            "llm_configured": stealth_on,
+            "llm_model": f"StealthGPT ({stealthgpt.get_model()})" if stealth_on else None,
             "providers": provider_choices,
             "uploads": {
                 "formats": ["txt", "md", "markdown", "docx", "pdf"],

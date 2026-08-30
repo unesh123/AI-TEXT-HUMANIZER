@@ -168,15 +168,37 @@ class Naturalizer:
             contractions=profile.get("contractions", False),
         )
 
-        # Local-only rewrite path: the deterministic engine is the sole
-        # backend. There is no LLM attempt, no provider failover, and no
-        # translation-chain hop to coordinate.
+        # Provider execution: support StealthGPT API if configured
+        from . import stealthgpt
+
         llm_used = False
         llm_rewritten = None
         llm_method: Optional[str] = None
         llm_provider: Optional[str] = None
         candidate: Optional[str] = None
         llm_warning: Optional[str] = None
+        stealthgpt_meta: Dict = {}
+
+        provider_norm = (provider or "auto").strip().lower()
+        should_try_stealthgpt = (
+            (provider_norm in {"stealthgpt", "stealth", "api"} or (provider_norm in {"auto", "local"} and use_llm))
+            and stealthgpt.is_configured()
+            and use_llm is not False
+        )
+
+        if should_try_stealthgpt:
+            stealth_res, stealth_meta, stealth_err = stealthgpt.stealthify(
+                text,
+                style=style,
+            )
+            if stealth_res:
+                llm_used = True
+                llm_rewritten = stealth_res
+                llm_provider = "stealthgpt"
+                llm_method = f"stealthgpt-{stealth_meta.get('model', 'heavy')}"
+                stealthgpt_meta = stealth_meta
+            elif stealth_err:
+                llm_warning = f"StealthGPT notice: {stealth_err} (using local deterministic rewrite)"
 
         # Semantic-preservation gate: a fluent rewrite that drops a number
         # is still wrong. Revert hard factual drift before returning it.
@@ -244,6 +266,8 @@ class Naturalizer:
                 "llm_issues": llm_semantic_issues,
             },
         }
+        if stealthgpt_meta:
+            metrics["stealthgpt"] = stealthgpt_meta
 
         return NaturalizeResult(
             original=text,
